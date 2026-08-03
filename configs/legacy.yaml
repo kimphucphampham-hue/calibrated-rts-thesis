@@ -1,0 +1,8 @@
+random_seed: 42
+n_splits: 5
+
+data:
+  path: data/raw/synthetic/synthetic_data.csv
+
+output:
+  directory: results/legacy
