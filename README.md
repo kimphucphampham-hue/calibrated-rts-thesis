@@ -10,3 +10,11 @@ Repository phục vụ tái lập chuyên đề tốt nghiệp và triển khai 
 - `configs/`: Cấu hình chạy thực nghiệm
 - `docs/`: Tài liệu và data dictionary
 - `results/`: Kết quả được sinh từ pipeline
+
+
+## Validate the synthetic dataset
+
+Activate the Python environment:
+
+```bash
+source .venv/bin/activate
