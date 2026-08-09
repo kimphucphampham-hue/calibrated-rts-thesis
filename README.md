@@ -63,3 +63,10 @@ The `original` mode reproduces the row-level
 The `corrected` mode applies temporal splitting to unique
 Sprint identifiers so that one Sprint cannot occur in both
 training and testing data.
+
+
+## Legacy reproduction report
+
+The complete legacy reproduction report is available at:
+
+- `reports/legacy_reproduction_report.md`
