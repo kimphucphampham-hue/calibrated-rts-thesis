@@ -10,7 +10,7 @@
 * **File cấu hình:** `configs/legacy.yaml`
 * **Ngày thực hiện:** 2026-08-05
 * **Người thực hiện:** Phạm Thị Kim Phúc
-* **Commit:** [[Git commit hash]]
+* **Commit:** `ac1896aaaf43f0cbdfa98c2ca5bfec5343114f8a`
 
 ## 2. Mục tiêu tái lập
 
@@ -27,15 +27,18 @@ Hoạt động này chỉ có mục đích tái lập và kiểm tra proof-of-co
 
 Các artifact được sử dụng gồm:
 
-| Artifact                | Đường dẫn                               | Vai trò                                       |
-| ----------------------- | --------------------------------------- | --------------------------------------------- |
-| Báo cáo chuyên đề       | `docs/previous_graduation_report.docx`  | Nguồn mô tả phương pháp và kết quả đã công bố |
-| Source code gốc         | `legacy/original_source_code.py`        | Nguồn xác định hành vi triển khai ban đầu     |
-| Dữ liệu giả lập         | `data/raw/synthetic/synthetic_data.csv` | Frozen dataset dùng để tái lập                |
-| Script kiểm tra dữ liệu | `src/validate_data.py`                  | Xác minh schema và chất lượng dữ liệu         |
-| Script tái lập          | `legacy/reproduce_legacy.py`            | Chạy lại protocol original và corrected       |
-| Cấu hình                | `configs/legacy.yaml`                   | Lưu seed, số fold, model và đường dẫn output  |
-| Dependency lock         | `requirements-lock.txt`                 | Ghi lại phiên bản thư viện                    |
+| Artifact | Đường dẫn | Vai trò |
+|---|---|---|
+| Báo cáo chuyên đề | `docs/previous_graduation_report.docx` | Nguồn mô tả phương pháp và kết quả đã công bố |
+| Source huấn luyện gốc | `legacy/original_source_code.py` | Nguồn xác định pipeline mô hình ban đầu |
+| Source sinh dữ liệu gốc | `legacy/original_source/generate_synthetic_data_original.py` | Bảo tồn logic sinh synthetic dataset ban đầu |
+| Notebook Colab gốc | `legacy/original_artifacts/original_colab_notebook.ipynb` | Artifact lịch sử của quá trình thực nghiệm ban đầu |
+| Frozen dataset | `data/raw/synthetic/synthetic_data.csv` | Dataset lịch sử dùng làm input tái lập |
+| Script sinh lại dữ liệu | `legacy/generate_synthetic_data.py` | Sinh lại synthetic dataset mà không ghi đè frozen artifact |
+| Script kiểm tra dữ liệu | `src/validate_data.py` | Xác minh schema và chất lượng dữ liệu |
+| Script tái lập | `legacy/reproduce_legacy.py` | Chạy protocol original và corrected |
+| Cấu hình | `configs/legacy.yaml` | Lưu seed, số fold, model và đường dẫn output |
+| Dependency lock | `requirements-lock.txt` | Đóng băng môi trường tái lập |               |
 
 Source code gốc không phải là một chương trình độc lập hoàn toàn vì nó giả định biến `df_synthetic` đã được tạo và tồn tại trong bộ nhớ. Script tái lập mới khắc phục điểm này bằng cách đọc trực tiếp file CSV từ đường dẫn được khai báo trong cấu hình.
 
@@ -72,7 +75,7 @@ Kết quả kiểm tra:
 | Thuộc tính            |                              Giá trị |
 | --------------------- | -----------------------------------: |
 | Trạng thái            | PASS_WITH_WARNINGS |
-| Số dòng               | 500 |
+| Số dòng               | 5000 |
 | Số cột                | 9 |
 | Số Sprint             | 50 |
 | Số test case duy nhất | 100 |
@@ -114,6 +117,7 @@ Như vậy, frozen dataset đạt các yêu cầu cơ bản về schema, tính �
 Tỷ lệ nhãn 1 quan sát được là 12,28%, cao hơn mức khoảng 10% được mô tả trong báo cáo.
 
 Sai khác này được ghi nhận như một thuộc tính của frozen artifact. Không thực hiện chỉnh sửa hoặc tái cân bằng dữ liệu gốc để ép dữ liệu khớp với mô tả trong báo cáo.
+Nguyên nhân của sai khác này được xác minh từ source code sinh dữ liệu và được phân tích chi tiết tại Mục 10.4.
 
 ## 6. Cấu hình mô hình
 
@@ -221,7 +225,7 @@ Vì vậy, kết quả corrected không được mô tả là sự tái lập ch
 
 | Mô hình           | Precision trung bình | Recall trung bình | F1 trung bình | Độ lệch chuẩn F1 | Selection Ratio | Runtime Ratio |
 | ----------------- | -------------------: | ----------------: | ------------: | ---------------: | --------------: | ------------: |
-| Random Forest     |              83.16% |           71,81% |       77,04% |          5% |         10,65% |       10,64% |
+| Random Forest     |              83,16% |           71,81% |       77,04% |          5% |         10,65% |       10,64% |
 | SVM               |              77,18% |           75,94% |       76,53% |          3,72% |         12,1% |       12,08% |
 | Gradient Boosting |              80,63% |           75,45% |       77,95% |          4,15% |         11,52% |       11,54% |
 
@@ -256,13 +260,13 @@ Các kết quả trên cho phép kết luận rằng protocol `original` đã t�
 | SVM               |     76,76% |      76,53% | -0,23 điểm phần trăm |
 | Gradient Boosting |     78,18% |      77,95% | -0,22 điểm phần trăm |
 
-Kết quả so sánh cho thấy F1 của cả ba mô hình đều giảm nhẹ sau khi thay protocol chia theo từng dòng bằng protocol chia theo `Sprint_ID`. Random Forest có mức giảm lớn nhất, từ 78,01% xuống 77,04%, tương ứng giảm khoảng 0,97 điểm phần trăm. SVM giảm từ 76,76% xuống 76,53%, trong khi Gradient Boosting giảm từ 78,18% xuống 77,95%; cả hai mô hình đều chỉ giảm khoảng 0,23 điểm phần trăm.
+Kết quả so sánh cho thấy F1 của cả ba mô hình đều giảm nhẹ sau khi thay protocol chia theo từng dòng bằng protocol chia theo `Sprint_ID`. Random Forest có mức giảm lớn nhất, từ 78,01% xuống 77,04%, tương ứng giảm khoảng 0,96 điểm phần trăm. SVM giảm từ 76,76% xuống 76,53%, trong khi Gradient Boosting giảm từ 78,18% xuống 77,95%; cả hai mô hình đều chỉ giảm khoảng 0,23 điểm phần trăm.
 
 Mức giảm F1 của protocol `corrected` là tương đối nhỏ, dưới 1 điểm phần trăm đối với cả ba mô hình. Điều này cho thấy hiệu năng tổng thể của các mô hình tương đối ổn định khi thay đổi đơn vị chia dữ liệu từ từng dòng sang từng Sprint. Gradient Boosting vẫn đạt F1 cao nhất trong protocol corrected, tiếp theo là Random Forest và SVM.
 
 Việc F1 giảm không đồng nghĩa protocol `corrected` kém hơn protocol `original`. Protocol original có thể cắt ngang ranh giới của một Sprint, khiến cùng một `Sprint_ID` xuất hiện trong cả tập huấn luyện và tập kiểm tra. Điều này có thể tạo ra lợi thế đánh giá không mong muốn do dữ liệu train và test thuộc cùng một chu kỳ phát triển. Ngược lại, protocol corrected giữ toàn bộ dữ liệu của một Sprint trong cùng một partition và bảo đảm các Sprint dùng để huấn luyện xảy ra trước các Sprint dùng để kiểm tra.
 
-Do đó, sự suy giảm nhỏ của F1 có thể được xem là chi phí hợp lý để đổi lấy một quy trình đánh giá nghiêm ngặt và đáng tin cậy hơn về mặt thời gian. Kết quả của protocol corrected phản ánh sát hơn khả năng của mô hình khi dự đoán trên các Sprint tương lai chưa từng được quan sát. Vì vậy, protocol corrected nên được ưu tiên cho các phân tích tiếp theo, mặc dù metric của nó thấp hơn nhẹ so với protocol original.
+Do đó, sự suy giảm nhỏ của F1 có thể được xem là chi phí hợp lý để đổi lấy một quy trình đánh giá nghiêm ngặt và đáng tin cậy hơn về mặt thời gian. Do đó, protocol corrected phù hợp hơn với nguyên tắc temporal evaluation ở cấp Sprint vì nó ngăn một Sprint xuất hiện đồng thời trong train và test. Tuy nhiên, do dữ liệu hiện tại là dữ liệu giả lập và không mô phỏng đầy đủ sự tiến hóa theo thời gian của một hệ thống CI thực tế, kết quả này chủ yếu được sử dụng để kiểm tra phương pháp chia dữ liệu, không được xem là bằng chứng về khả năng tổng quát hóa trên các Sprint tương lai trong môi trường thực tế.
 
 
 ## 10. Các điểm không nhất quán được phát hiện
@@ -318,7 +322,6 @@ Do đó, phát biểu “bộ dữ liệu đạt chính xác tỷ lệ 10/90” 
 
 Phần tóm tắt của báo cáo đề cập Recall của SVM là 88%, trong khi Bảng 4.1 ghi Recall là 76,09%. Báo cáo tái lập sử dụng Bảng 4.1 làm nguồn tham chiếu định lượng vì bảng này cung cấp đầy đủ Precision, Recall và F1 cho cả ba mô hình.
 
-## 11. Đánh giá khả năng tái lập
 
 ## 11. Đánh giá khả năng tái lập
 
@@ -451,7 +454,7 @@ Ngoài ra, quá trình tái lập phát hiện sự không thống nhất giữa
 Tổng thể, repository đáp ứng yêu cầu của một gói tái lập ở mức kỹ thuật: có thể chạy lại, kiểm tra được, lưu lại output và giải thích được các sai khác chính. Tuy nhiên, không thể phân loại là exact reproduction vì metric chưa khớp tuyệt đối, môi trường thực nghiệm ban đầu chưa được lưu và protocol trong báo cáo không hoàn toàn thống nhất với source code.
 
 
-## 12. Hạn chế
+## 12. Hạn chế và biện pháp giảm thiểu
 
 ### 12.1. Khả năng tái tạo dữ liệu giả lập
 
@@ -468,8 +471,6 @@ Do đó, việc thiếu source code sinh dữ liệu không còn được xem l�
 Thực nghiệm ban đầu của chuyên đề tốt nghiệp được thực hiện trên Google Colab. Tuy nhiên, tại thời điểm thực nghiệm ban đầu, môi trường chưa được đóng băng bằng `pip freeze`, dependency lock file hoặc container image. Vì vậy, phiên bản chính xác của Python và toàn bộ các thư viện tại thời điểm tạo ra kết quả được công bố chưa được xác nhận đầy đủ.
 
 Trong quá trình xây dựng artifact tái lập, notebook được mở lại trên Google Colab và môi trường hiện tại được kiểm tra. Lần kiểm tra này ghi nhận Python 3.12.13, NumPy 2.0.2, Pandas 2.2.2, scikit-learn 1.6.1 và imbalanced-learn 0.14.2. Tuy nhiên, các phiên bản này thuộc runtime Colab tại thời điểm kiểm tra tái lập và không được xem là bằng chứng rằng cùng các phiên bản đã được sử dụng trong thực nghiệm ban đầu.
-
-Repository lưu snapshot của môi trường Colab hiện tại và môi trường tái lập cục bộ để các lần chạy mới có thể được kiểm tra và so sánh. Đồng thời, notebook Colab gốc được lưu dưới dạng artifact lịch sử để tìm kiếm các output, lệnh cài đặt package hoặc metadata còn sót lại có thể giúp khôi phục một phần môi trường ban đầu.
 
 Do chưa có bằng chứng đầy đủ về toàn bộ dependency của runtime lịch sử, repository chưa thể bảo đảm môi trường tái lập hiện tại hoàn toàn giống môi trường đã tạo ra các metric trong báo cáo chuyên đề. Đây vẫn được xem là một hạn chế của quá trình tái lập.
 
@@ -503,6 +504,15 @@ source .venv/bin/activate
 python -m pip install -r requirements-lock.txt
 ```
 
+Sinh lại synthetic dataset để kiểm chứng
+
+```bash
+python legacy/generate_synthetic_data.py
+```
+Dataset được sinh lại tại:
+data/interim/synthetic_regenerated.csv
+Frozen artifact tại data/raw/synthetic/synthetic_data.csv không bị ghi đè.
+
 Kiểm tra dữ liệu:
 
 ```bash
@@ -530,7 +540,7 @@ python legacy/reproduce_legacy.py --mode both
 Chạy test:
 
 ```bash
-python -m pytest tests/test_temporal_split.py -v
+python -m pytest -v
 ```
 
 Các kết quả được ghi tại:
@@ -545,6 +555,6 @@ Repository tái lập đã chuyển proof-of-concept của chuyên đề tốt n
 
 Protocol original giúp tái hiện hành vi của source code hiện có. Protocol corrected khắc phục vấn đề chia dữ liệu theo từng dòng bằng cách chia theo đơn vị Sprint, qua đó bảo đảm một Sprint không xuất hiện đồng thời trong train và test.
 
-Kết quả tái lập [[khớp gần đúng/không khớp hoàn toàn/khớp]] với các metric được công bố. Các sai khác được ghi nhận minh bạch và không bị điều chỉnh thủ công để làm cho kết quả mới giống báo cáo cũ.
+Kết quả tái lập khớp gần đúng với các metric được công bố. Các sai khác được ghi nhận minh bạch và không bị điều chỉnh thủ công để làm cho kết quả mới giống báo cáo cũ.
 
 Artifact này hoàn thành vai trò sanity-check và tạo nền tảng kỹ thuật ban đầu cho luận văn thạc sĩ. Các thực nghiệm chính của luận văn sẽ sử dụng dữ liệu CI thực, đánh giá theo thời gian và protocol được định nghĩa trước.
