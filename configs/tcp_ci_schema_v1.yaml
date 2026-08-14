@@ -1,0 +1,312 @@
+schema_version: "1.0"
+
+dataset: "tcp_ci"
+
+description: >
+  Canonical schema for normalizing TCP-CI data before
+  pilot experiments and thesis experiments.
+
+# ============================================================
+# OBSERVATION GRANULARITY
+# ============================================================
+
+staging:
+  granularity: "test_job_execution"
+
+  key:
+    - project_id
+    - build_id
+    - job_id
+    - test_id
+
+  note: >
+    Raw TCP-CI execution records may be associated with CI jobs.
+    Aggregation from test-job level to test-build level must be
+    defined by the experimental protocol before modeling.
+
+
+canonical:
+  granularity: "test_build"
+
+  primary_key:
+    - project_id
+    - build_id
+    - test_id
+
+  temporal_order:
+    - project_id
+    - build_started_at
+    - build_id
+
+
+# ============================================================
+# CORE COLUMNS
+# ============================================================
+
+columns:
+
+  project_id:
+    data_type: "string"
+    role: "identifier"
+    unit: "N/A"
+    required: true
+    status: "CONFIRMED"
+    source_candidates:
+      - "project repository slug"
+      - "project directory name"
+
+  build_id:
+    data_type: "string"
+    role: "identifier"
+    unit: "N/A"
+    required: true
+    status: "CONFIRMED"
+    source_candidates:
+      - "travisBuildId"
+      - "tr_build_id"
+
+  build_started_at:
+    data_type: "datetime"
+    role: "timestamp"
+    unit: "UTC"
+    required: true
+    status: "CONFIRMED"
+    source_candidates:
+      - "gh_build_started_at"
+
+  build_index:
+    data_type: "integer"
+    role: "context"
+    unit: "build"
+    required: true
+    status: "CONFIRMED"
+    source_candidates:
+      - "DERIVED"
+    derivation: >
+      Chronological dense index assigned within each project
+      after ordering builds by build_started_at and using
+      build_id as a deterministic tie breaker.
+
+  test_id:
+    data_type: "string"
+    role: "identifier"
+    unit: "N/A"
+    required: true
+    status: "CONFIRMED"
+    source_candidates:
+      - "testName"
+
+execution_time_ms:
+  data_type: "float"
+  role: "cost"
+  unit: "milliseconds"
+  required: true
+
+  available_at: "post_test_execution"
+  history_scope: "current test execution"
+  leakage_risk: "LEAKAGE"
+
+  source_candidates:
+    - "duration"
+
+  derivation: >
+    Convert TCP-CI duration from seconds to milliseconds
+    by multiplying by 1000.
+
+  note: >
+    The actual duration of the current test is not available
+    at the pre-execution selection decision point. A historical
+    duration estimate must be used as the decision-time cost.
+
+failed:
+  data_type: "integer"
+  role: "target"
+  unit: "N/A"
+  required: true
+  status: "CONFIRMED"
+
+  available_at: "post_test_execution"
+  history_scope: "current test outcome"
+  leakage_risk: "LEAKAGE"
+
+  allowed_values:
+    - 0
+    - 1
+
+
+# ============================================================
+# OPTIONAL SOURCE METADATA
+# ============================================================
+
+optional_columns:
+
+  job_id:
+    data_type: "string"
+    role: "metadata"
+    source_candidates:
+      - "travisJobId"
+
+commit_hashes:
+  data_type: "string"
+  role: "context"
+
+  available_at: "pre_test_execution"
+  history_scope: "current build context"
+  leakage_risk: "SAFE"
+
+  source_candidates:
+    - "git_all_built_commits"
+
+  test_method_count:
+    data_type: "integer"
+    role: "metadata"
+    source_candidates:
+      - "count"
+
+  failure_count:
+    data_type: "integer"
+    role: "metadata"
+    source_candidates:
+      - "failures"
+
+  error_count:
+    data_type: "integer"
+    role: "metadata"
+    source_candidates:
+      - "errors"
+
+  skipped_count:
+    data_type: "integer"
+    role: "metadata"
+    source_candidates:
+      - "skipped"
+
+
+# ============================================================
+# CANDIDATE FEATURE SCHEMA
+# ============================================================
+
+candidate_features:
+
+  history:
+
+    failure_rate_history:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "same test, builds < b"
+      leakage_risk: "SAFE"
+
+    recent_failure:
+      data_type: "integer"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "most recent execution of the same test before b"
+      leakage_risk: "SAFE"
+
+    consecutive_failures:
+      data_type: "integer"
+      required: false
+      status: "CANDIDATE"
+
+    consecutive_passes:
+      data_type: "integer"
+      required: false
+      status: "CANDIDATE"
+
+    test_age_builds:
+      data_type: "integer"
+      unit: "build"
+      required: false
+      status: "CANDIDATE"
+
+    time_since_last_failure_builds:
+      data_type: "integer"
+      unit: "build"
+      required: false
+      status: "CANDIDATE"
+
+    execution_time_mean_history_ms:
+      data_type: "float"
+      unit: "milliseconds"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "same test, execution durations from builds < b"
+      leakage_risk: "SAFE"
+
+
+  change_context:
+
+    changed_loc:
+      data_type: "integer"
+      unit: "lines"
+      required: false
+      status: "CANDIDATE"
+
+    changed_files_count:
+      data_type: "integer"
+      unit: "files"
+      required: false
+      status: "CANDIDATE"
+
+    code_churn:
+      data_type: "integer"
+      unit: "lines"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "current build change context"
+      leakage_risk: "SAFE"
+
+    complexity:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+
+    dependency_score:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+
+    coverage_to_change:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: >
+        historical or otherwise pre-existing coverage combined
+        with the current build change set
+
+      leakage_risk: "CONDITIONAL"
+
+      note: >
+        Coverage produced by executing tests in the current build
+        must not be used for selecting tests in that same build.
+
+
+  temporal:
+
+    recent_failure_density:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "configured window of builds < b"
+      leakage_risk: "SAFE"
+
+    execution_time_trend:
+      data_type: "float"
+      required: false
+      status: "CANDIDATE"
+      available_at: "pre_test_execution"
+      history_scope: "historical execution durations from builds < b"
+      leakage_risk: "SAFE"
