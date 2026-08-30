@@ -1,0 +1,86 @@
+version: 1
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+inputs:
+  raw_root: "data/raw/tcp_ci/main_dataset"
+  pilot_projects_config: "configs/pilot_projects_v1.yaml"
+
+outputs:
+  interim_root: "data/interim/tcp_ci/pilot"
+  diagnostics_root: "results/pilot/adapter"
+  processed_root: "data/processed/tcp_ci/pilot"
+
+staging:
+  granularity: "test_job_execution"
+
+  key:
+    - project_id
+    - build_id
+    - job_id
+    - test_id
+
+verdict_mapping:
+  pass:
+    - 0
+
+  fail:
+    - 1
+    - 2
+    - 3
+
+duration:
+  source_field: "exe.csv:duration"
+  staging_field: "duration_raw"
+  source_unit: "milliseconds"
+  canonical_field: "execution_time_ms"
+  canonical_unit: "milliseconds"
+  canonical_conversion: "identity"
+  convert_at_staging: false
+  status: "CONFIRMED"
+
+build_order:
+  source_timestamp: "builds.csv:started_at"
+  canonical_field: "build_started_at"
+  index_field: "build_index"
+  order: "ascending"
+
+canonical_target:
+  granularity: "test_build"
+
+  key:
+    - project_id
+    - build_id
+    - test_id
+
+  core_columns:
+    - project_id
+    - build_id
+    - build_started_at
+    - build_index
+    - test_id
+    - execution_time_ms
+    - failed
+
+  metadata_columns:
+    - job_id
+    - commit_hashes
+    - verdict_raw
+
+  status: "CONFIRMED_FOR_PILOT_V1"
+
+notes:
+  - >
+    The staging adapter preserves exe.csv:duration without unit
+    conversion because the unit of the published v3 artifact has
+    not yet been verified.
+
+  - >
+    Rows are not collapsed from test-job-execution to test-build
+    granularity until duplicate test/build behavior across jobs
+    has been empirically inspected.
+
+  - >
+    Raw TCP-CI files must never be modified by the adapter.

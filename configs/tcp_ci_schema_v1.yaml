@@ -21,8 +21,12 @@ staging:
 
   note: >
     Raw TCP-CI execution records may be associated with CI jobs.
-    Aggregation from test-job level to test-build level must be
-    defined by the experimental protocol before modeling.
+    For the five pilot projects, no duplicate (build_id, test_id)
+    groups, multi-job groups, or conflicting verdict groups were
+    observed. Therefore, no aggregation is required when
+    materializing the pilot test_build canonical representation.
+    This condition must be revalidated if the project scope is
+    expanded.
 
 
 canonical:
@@ -97,9 +101,9 @@ columns:
       - "exe.csv:test"
 
   execution_time_ms:
-    data_type: "float"
+    data_type: "integer"
     role: "cost"
-    unit: "TBD"
+    unit: "milliseconds"
     required: true
     status: "CONFIRMED"
 
@@ -111,16 +115,20 @@ columns:
       - "exe.csv:duration"
 
     derivation: >
-      The downloaded TCP-CI v3 artifact stores the execution
-      duration in `exe.csv:duration`. The unit of this field
-      has not yet been frozen because the published artifact
-      must be checked separately from the raw-input
-      documentation. No unit conversion is applied at this stage.
+      Direct identity mapping from `exe.csv:duration`.
+      The inspected TCP-CI upstream implementation multiplies
+      the parsed execution duration by 1000.0 before constructing
+      an `ExecutionRecord`, and that integer value is subsequently
+      written to `exe.csv`. Therefore, the published v3 duration
+      is treated as milliseconds and no further numerical
+      conversion is applied during thesis canonicalization.
 
     note: >
-      The actual duration of the current test is not available
-      at the pre-execution selection decision point. A historical
-      duration estimate must be used as the decision-time cost.
+      The actual duration of the current test is available only
+      after that test has executed and therefore must not be used
+      directly as a pre-execution selection feature for the same
+      build. A duration estimate derived strictly from executions
+      before the target build must be used as decision-time cost.
 
   failed:
     data_type: "integer"

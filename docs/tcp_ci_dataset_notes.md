@@ -77,7 +77,7 @@ the CORE pilot feature schema.
 
 ### `dataset.csv`
 
-Contains test-case features across failed CI builds.
+Contains precomputed test-case features associated with CI builds.
 
 Inventory findings:
 
@@ -89,8 +89,10 @@ Inventory findings:
 
 Still open:
 
-- the exact row granularity used for thesis normalization;
-- the semantic role of the `Build` and `Test` identifiers;
+- the exact row semantics of `dataset.csv` when it is used as
+  a source of precomputed features for the thesis pipeline;
+- the precise source-code/test-class semantics represented by
+  the encoded `Test` entity beyond the verified pilot mapping;
 - whether `dataset.csv` contains only failed builds;
 - which precomputed features are temporally valid and suitable
   for the CORE pilot feature set.
@@ -127,16 +129,17 @@ each build during the pilot experiments.
 
 ### Execution duration
 
-In the documented raw CI input format, `duration` is expressed
-in seconds.
+`exe.csv:duration` is present without missing values across
+the 25 projects inspected.
 
-The thesis intends to use a canonical execution-cost measure,
-but the unit of `exe.csv:duration` in the downloaded published
-v3 artifact has not yet been verified.
+The physical unit was subsequently resolved during pilot
+canonicalization through upstream implementation inspection.
 
-Therefore, the raw-input rule must not yet be applied directly
-to the published `exe.csv` artifact, and no unit conversion is
-performed at this stage.
+The published `exe.csv:duration` value is treated as
+milliseconds.
+
+No numerical conversion is required when mapping it to
+`execution_time_ms`.
 
 
 ### `builds.csv`
@@ -248,15 +251,26 @@ Potential sources:
 - Every build identifier observed in `exe.csv:build` maps to a
   corresponding `builds.csv:id` within the same project.
 - No duplicate `builds.csv:id` values were observed within a project.
+- For all five pilot projects, `exe.csv:test` matches
+  `id_map.csv:value` with rate 1.0 and does not match
+  `id_map.csv:key`.
+- No repeated `(build_id, test_id)` execution groups were
+  observed in the five pilot projects.
+- No multi-job `(build_id, test_id)` groups or conflicting
+  verdict groups were observed in the five pilot projects.
+- The canonical `(project_id, build_id, test_id)` key was
+  verified to be non-null and unique across all five pilots.
+- `exe.csv:duration` was confirmed to be represented in
+  milliseconds in the inspected TCP-CI implementation.
 
 ### Still open
 
-- What is the exact semantic identity represented by `exe.csv:test`?
-- Is `test` stable across builds and how does it relate to `id_map.csv`?
-- Can the same test appear more than once in a build across multiple jobs?
-- What is the confirmed unit of `exe.csv:duration`?
 - Does `dataset.csv` contain only failed builds?
-- Which F1/F2/F3 fields will be retained in the CORE pilot feature set?
+- Which F1/F2/F3 fields will be retained in the CORE pilot
+  feature set?
+- What precise source-code/test-class semantics should be
+  attached to the encoded test entity beyond the verified
+  `id_map.csv:value` relationship?
 
 
 ### Test granularity caveat
@@ -265,10 +279,14 @@ The documented CI input format identifies a test using the full
 test class name (`testName`) so that it can be matched to its
 corresponding source file.
 
-Therefore, `test_id` must not yet be assumed to represent an
-individual test method. The exact semantic identity and
-granularity of `exe.csv:test` will be verified during pilot
-normalization and test-identity analysis.
+Pilot verification established that `exe.csv:test` contains the
+encoded entity identifier corresponding to `id_map.csv:value`.
+
+This identifier is therefore used as the stable thesis
+`test_id` for canonicalization.
+
+However, it must not be interpreted as an individual
+test-method identifier without additional evidence.
 
 
 ## 8. Difference from the original TCP-CI study
@@ -359,11 +377,13 @@ artifact.
 `exe.csv:duration` is present without missing values across
 the 25 projects inspected.
 
-However, the unit of `duration` in the published v3 artifact
-has not yet been frozen.
+At the inventory stage, the physical unit of the published
+`duration` field had not yet been verified. Therefore, the
+inventory process preserved the raw values without applying
+any numerical conversion.
 
-Therefore, no conversion to milliseconds is performed at the
-inventory stage.
+The unit was subsequently resolved during pilot
+canonicalization, as documented below.
 
 ### Static/dependency analysis artifacts
 
@@ -384,3 +404,75 @@ the published v3 `exe.csv` schema.
 They are therefore marked `UNAVAILABLE` for the currently used
 main-dataset artifact rather than treated as confirmed source
 fields.
+
+
+### Duration unit resolution
+
+The physical unit of `exe.csv:duration` was verified against
+the upstream TCP-CI implementation.
+
+`TrTorrentProcessor` extracts the numeric duration reported by
+the CI test output. During execution-record construction,
+`RtpTorrentExtractor` explicitly multiplies the aggregated
+duration by `1000.0`:
+
+`int(row[ExecutionRecord.DURATION] * 1000.0)`
+
+The resulting value is stored by `ExecutionRecord` without
+further numerical conversion and is subsequently written to
+`exe.csv` by `DataCollectionService`.
+
+A repository-wide inspection of the upstream implementation
+identified a single `ExecutionRecord` construction site in the
+inspected code path.
+
+For all five selected pilot projects,
+`dataset.csv:Duration` also matched `exe.csv:duration` exactly
+for every matched `(Build, Test)` record.
+
+Therefore, the thesis pipeline treats `exe.csv:duration` and
+`dataset.csv:Duration` as milliseconds.
+
+Canonical mapping:
+
+`exe.csv:duration` -> `execution_time_ms`
+
+No numerical conversion is applied during canonicalization.
+
+
+### Pilot canonical granularity verification
+
+The five pilot projects were inspected for repeated
+`(build_id, test_id)` execution records.
+
+Across all five pilots:
+
+- duplicate `(build_id, test_id)` groups: 0
+- multi-job `(build_id, test_id)` groups: 0
+- conflicting-verdict groups: 0
+
+Therefore, no aggregation is required when transforming the
+pilot execution records from the published execution-level
+representation to the thesis `test_build` canonical
+granularity.
+
+The canonical key is:
+
+`(project_id, build_id, test_id)`
+
+This key was empirically verified to be non-null and unique
+across all five pilot datasets.
+
+
+### Test identifier verification
+
+For all five pilot projects, the values of `exe.csv:test`
+matched `id_map.csv:value` with a rate of `1.0`, while the
+match rate against `id_map.csv:key` was `0.0`.
+
+Therefore, the thesis adapter treats `exe.csv:test` as the
+encoded entity identifier corresponding to
+`id_map.csv:value`.
+
+The identifier is not interpreted as an individual test-method
+identifier without additional evidence.
