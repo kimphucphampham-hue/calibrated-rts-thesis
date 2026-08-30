@@ -30,6 +30,11 @@ SUPPORT_COLUMNS = [
     "prior_failure_count",
 ]
 
+HISTORY_GROUP_KEYS = [
+    "project_id",
+    "test_id",
+]
+
 
 def load_yaml(path: Path) -> dict:
     with path.open(
@@ -117,10 +122,11 @@ def compute_history_features(
         result
         .sort_values(
             [
+                "project_id",
                 "build_index",
                 "test_id",
             ],
-            kind="stable",
+        kind="stable",
         )
         .reset_index(drop=True)
     )
@@ -173,7 +179,7 @@ def compute_history_features(
     ] = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )
         .cumcount()
@@ -198,7 +204,7 @@ def compute_history_features(
     cumulative_failures = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )["failed"]
         .cumsum()
@@ -239,7 +245,7 @@ def compute_history_features(
     ] = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )["failed"]
         .shift(1)
@@ -255,7 +261,7 @@ def compute_history_features(
     first_seen_build = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )["build_index"]
         .cummin()
@@ -288,7 +294,7 @@ def compute_history_features(
     previous_failure_candidate = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )["_failure_build"]
         .shift(1)
@@ -297,7 +303,10 @@ def compute_history_features(
     last_failure_before = (
         previous_failure_candidate
         .groupby(
-            result["test_id"],
+            [
+                result["project_id"],
+                result["test_id"],
+            ],
             sort=False,
         )
         .ffill()
@@ -320,7 +329,7 @@ def compute_history_features(
     cumulative_duration = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )[
             "execution_time_ms"
@@ -364,7 +373,10 @@ def compute_history_features(
     result["_run_id"] = (
         run_start
         .groupby(
-            result["test_id"],
+            [
+                result["project_id"],
+                result["test_id"],
+            ],
             sort=False,
         )
         .cumsum()
@@ -375,6 +387,7 @@ def compute_history_features(
         result
         .groupby(
             [
+                "project_id",
                 "test_id",
                 "_run_id",
             ],
@@ -388,7 +401,7 @@ def compute_history_features(
     previous_run_position = (
         result
         .groupby(
-            "test_id",
+            HISTORY_GROUP_KEYS,
             sort=False,
         )[
             "_run_position"
