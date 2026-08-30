@@ -1,0 +1,57 @@
+version: 1
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+purpose: >
+  Initial multi-project pilot for validating the thesis
+  normalization, temporal feature construction, probability
+  calibration, and risk-cost test-selection pipeline.
+
+selection_protocol:
+  screening_config: "configs/pilot_screening_v1.yaml"
+  source_inventory: "results/pilot/inventory/project_inventory.csv"
+  screening_output: "results/pilot/screening/project_screening.csv"
+
+selection_summary:
+  inventoried_projects: 25
+  eligible_projects: 18
+  selected_projects: 5
+
+projects:
+  - project_key: "datasets/camunda@camunda-bpm-platform"
+    owner: "camunda"
+    pilot_rank: 1
+
+  - project_key: "datasets/apache@shardingsphere"
+    owner: "apache"
+    pilot_rank: 2
+
+  - project_key: "datasets/facebook@buck"
+    owner: "facebook"
+    pilot_rank: 3
+
+  - project_key: "datasets/Angel-ML@angel"
+    owner: "Angel-ML"
+    pilot_rank: 4
+
+  - project_key: "datasets/zolyfarkas@spf4j"
+    owner: "zolyfarkas"
+    pilot_rank: 5
+
+notes:
+  - >
+    Pilot selection is based only on dataset feasibility,
+    outcome support, temporal availability, computational
+    tractability, and repository-owner diversity.
+
+  - >
+    Downstream model performance, including discrimination,
+    calibration, failure-detection effectiveness, retained
+    risk, and cost saving, was not used for pilot selection.
+
+  - >
+    The five-project pilot set is intended for pipeline
+    validation and is not automatically the final project set
+    for the full thesis experiment.

@@ -1,0 +1,53 @@
+version: 1
+
+description: >
+  Screening criteria for selecting the initial TCP-CI pilot
+  projects. These criteria are used for pipeline feasibility
+  and are not the final project-selection protocol for the
+  full thesis experiment.
+
+source_inventory:
+  path: "results/pilot/inventory/project_inventory.csv"
+
+selection:
+  pilot_count: 5
+  max_projects_per_owner: 1
+
+eligibility:
+  min_unique_builds: 200
+  min_unique_tests: 40
+  min_fail_rows: 100
+  min_failure_rate: 0.001
+  max_execution_rows: 1000000
+
+  require_zero_other_result_rows: true
+  require_zero_duration_missing: true
+  require_full_timestamp_parse: true
+
+ranking:
+  primary:
+    field: "fail_rows"
+    order: "descending"
+
+  secondary:
+    field: "unique_builds_in_exe"
+    order: "descending"
+
+  tie_breaker:
+    field: "project_key"
+    order: "ascending"
+
+notes:
+  - >
+    The execution-row upper bound is a pilot tractability
+    constraint only and must not automatically be reused for
+    the full thesis experiment.
+
+  - >
+    Project selection must not use downstream model
+    performance such as AUC, calibration error, cost saving,
+    or retained-risk results.
+
+  - >
+    Owner diversity is used to exercise the pilot pipeline
+    across heterogeneous projects.
