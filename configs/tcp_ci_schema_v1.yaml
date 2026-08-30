@@ -62,8 +62,8 @@ columns:
     required: true
     status: "CONFIRMED"
     source_candidates:
-      - "travisBuildId"
-      - "tr_build_id"
+      - "exe.csv:build"
+      - "builds.csv:id"
 
   build_started_at:
     data_type: "datetime"
@@ -72,7 +72,7 @@ columns:
     required: true
     status: "CONFIRMED"
     source_candidates:
-      - "gh_build_started_at"
+      - "builds.csv:started_at"
 
   build_index:
     data_type: "integer"
@@ -94,45 +94,63 @@ columns:
     required: true
     status: "CONFIRMED"
     source_candidates:
-      - "testName"
+      - "exe.csv:test"
 
-execution_time_ms:
-  data_type: "float"
-  role: "cost"
-  unit: "milliseconds"
-  required: true
+  execution_time_ms:
+    data_type: "float"
+    role: "cost"
+    unit: "TBD"
+    required: true
+    status: "CONFIRMED"
 
-  available_at: "post_test_execution"
-  history_scope: "current test execution"
-  leakage_risk: "LEAKAGE"
+    available_at: "post_test_execution"
+    history_scope: "current test execution"
+    leakage_risk: "LEAKAGE"
 
-  source_candidates:
-    - "duration"
+    source_candidates:
+      - "exe.csv:duration"
 
-  derivation: >
-    Convert TCP-CI duration from seconds to milliseconds
-    by multiplying by 1000.
+    derivation: >
+      The downloaded TCP-CI v3 artifact stores the execution
+      duration in `exe.csv:duration`. The unit of this field
+      has not yet been frozen because the published artifact
+      must be checked separately from the raw-input
+      documentation. No unit conversion is applied at this stage.
 
-  note: >
-    The actual duration of the current test is not available
-    at the pre-execution selection decision point. A historical
-    duration estimate must be used as the decision-time cost.
+    note: >
+      The actual duration of the current test is not available
+      at the pre-execution selection decision point. A historical
+      duration estimate must be used as the decision-time cost.
 
-failed:
-  data_type: "integer"
-  role: "target"
-  unit: "N/A"
-  required: true
-  status: "CONFIRMED"
+  failed:
+    data_type: "integer"
+    role: "target"
+    unit: "N/A"
+    required: true
+    status: "CONFIRMED"
 
-  available_at: "post_test_execution"
-  history_scope: "current test outcome"
-  leakage_risk: "LEAKAGE"
+    available_at: "post_test_execution"
+    history_scope: "current test outcome"
+    leakage_risk: "LEAKAGE"
 
-  allowed_values:
-    - 0
-    - 1
+    source_candidates:
+      - "exe.csv:verdict"
 
+    allowed_values:
+      - 0
+      - 1
+
+    derivation: >
+      For the downloaded TCP-CI v3 artifact, verdict=0 maps to
+      failed=0 and verdict in {1,2} maps to failed=1.
+      TCP-CI documentation additionally defines result code 3
+      as an unknown failure; if encountered, it is also mapped
+      to failed=1.
+
+    source_note: >
+      The downloaded TCP-CI v3 artifact uses the column name
+      `verdict`, whereas the TCP-CI repository documentation
+      refers to this execution-outcome concept as `test_result`.
 
 # ============================================================
 # OPTIONAL SOURCE METADATA
@@ -143,43 +161,65 @@ optional_columns:
   job_id:
     data_type: "string"
     role: "metadata"
+    status: "CONFIRMED"
     source_candidates:
-      - "travisJobId"
+      - "exe.csv:job"
 
-commit_hashes:
-  data_type: "string"
-  role: "context"
+  commit_hashes:
+    data_type: "string"
+    role: "context"
+    status: "CONFIRMED"
 
-  available_at: "pre_test_execution"
-  history_scope: "current build context"
-  leakage_risk: "SAFE"
+    available_at: "pre_test_execution"
+    history_scope: "current build context"
+    leakage_risk: "SAFE"
 
-  source_candidates:
-    - "git_all_built_commits"
+    source_candidates:
+      - "builds.csv:commits"
 
   test_method_count:
     data_type: "integer"
     role: "metadata"
+    status: "UNAVAILABLE"
     source_candidates:
       - "count"
+    note: >
+      This concept is documented in the raw TCP-CI input format
+      but the corresponding field was not observed in the
+      downloaded TCP-CI v3 main-dataset `exe.csv` artifact.
 
   failure_count:
     data_type: "integer"
     role: "metadata"
+    status: "UNAVAILABLE"
     source_candidates:
       - "failures"
+    note: >
+      This concept is documented in the raw TCP-CI input format
+      but the corresponding field was not observed in the
+      downloaded TCP-CI v3 main-dataset `exe.csv` artifact.
 
   error_count:
     data_type: "integer"
     role: "metadata"
+    status: "UNAVAILABLE"
     source_candidates:
       - "errors"
+    note: >
+      This concept is documented in the raw TCP-CI input format
+      but the corresponding field was not observed in the
+      downloaded TCP-CI v3 main-dataset `exe.csv` artifact.
 
   skipped_count:
     data_type: "integer"
     role: "metadata"
+    status: "UNAVAILABLE"
     source_candidates:
       - "skipped"
+    note: >
+      This concept is documented in the raw TCP-CI input format
+      but the corresponding field was not observed in the
+      downloaded TCP-CI v3 main-dataset `exe.csv` artifact.
 
 
 # ============================================================
