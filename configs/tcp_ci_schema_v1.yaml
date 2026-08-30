@@ -240,12 +240,18 @@ candidate_features:
 
     failure_rate_history:
       data_type: "float"
+      unit: "ratio"
       required: false
       status: "CANDIDATE"
 
       available_at: "pre_test_execution"
       history_scope: "same test, builds < b"
       leakage_risk: "SAFE"
+
+      derivation: >
+        Number of failed prior executions of the same test
+        divided by the number of observed prior executions.
+        The current-build outcome is excluded.
 
     recent_failure:
       data_type: "integer"
@@ -256,15 +262,41 @@ candidate_features:
       history_scope: "most recent execution of the same test before b"
       leakage_risk: "SAFE"
 
+      allowed_values:
+        - 0
+        - 1
+
+      derivation: >
+        Binary failed value from the most recent observed
+        execution of the same test strictly before build b.
+
     consecutive_failures:
       data_type: "integer"
+      unit: "execution"
       required: false
       status: "CANDIDATE"
 
+      available_at: "pre_test_execution"
+      history_scope: "same test, builds < b"
+      leakage_risk: "SAFE"
+
+      derivation: >
+        Number of consecutive failed executions immediately
+        preceding the target build.
+
     consecutive_passes:
       data_type: "integer"
+      unit: "execution"
       required: false
       status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "same test, builds < b"
+      leakage_risk: "SAFE"
+
+      derivation: >
+        Number of consecutive passed executions immediately
+        preceding the target build.
 
     test_age_builds:
       data_type: "integer"
@@ -272,11 +304,27 @@ candidate_features:
       required: false
       status: "CANDIDATE"
 
+      available_at: "pre_test_execution"
+      history_scope: "same test, builds <= b; no outcomes from b"
+      leakage_risk: "SAFE"
+
+      derivation: >
+        Current build_index minus the first observed
+        build_index of the same test.
+
     time_since_last_failure_builds:
       data_type: "integer"
       unit: "build"
       required: false
       status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "same test, failures from builds < b"
+      leakage_risk: "SAFE"
+
+      derivation: >
+        Current build_index minus the build_index of the
+        most recent prior failure of the same test.
 
     execution_time_mean_history_ms:
       data_type: "float"
@@ -287,6 +335,11 @@ candidate_features:
       available_at: "pre_test_execution"
       history_scope: "same test, execution durations from builds < b"
       leakage_risk: "SAFE"
+
+      derivation: >
+        Arithmetic mean of execution_time_ms over all prior
+        observed executions of the same test. The current-build
+        execution duration is excluded.
 
 
   change_context:
