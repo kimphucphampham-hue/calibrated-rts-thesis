@@ -1,0 +1,65 @@
+version: 1
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+purpose: >
+  Chronological outer train/test holdout for the initial
+  five-project TCP-CI pilot.
+
+inputs:
+  history_root: "data/processed/tcp_ci/pilot_history"
+  pilot_projects_config: "configs/pilot_projects_v1.yaml"
+
+outputs:
+  split_root: "data/processed/tcp_ci/pilot_split"
+  diagnostics_root: "results/pilot/temporal_split"
+
+split:
+  unit: "build"
+  strategy: "chronological_holdout"
+  train_fraction: 0.80
+  rounding: "floor"
+
+  min_train_builds: 100
+  min_test_builds: 20
+
+  train_label: "train"
+  test_label: "test"
+
+temporal_rule:
+  ordering_field: "build_index"
+  train_before_test: true
+  same_build_must_remain_in_one_split: true
+  random_split_allowed: false
+  label_stratification_allowed: false
+
+holdout_policy:
+  test_used_for_model_fit: false
+  test_used_for_calibration_fit: false
+  test_used_for_feature_selection: false
+  test_used_for_hyperparameter_tuning: false
+
+notes:
+  - >
+    The split boundary is determined only from chronological
+    build order and the configured train fraction. Failure
+    labels and execution costs do not influence the boundary.
+
+  - >
+    History features remain causally defined using information
+    available before each target build. For a later test-period
+    build, history may contain outcomes from earlier test-period
+    builds because those outcomes are chronologically available
+    by that point.
+
+  - >
+    Model parameters must nevertheless be fitted only from the
+    training period unless a later explicitly defined retraining
+    protocol permits otherwise.
+
+  - >
+    This chronological holdout is used for initial pilot
+    validation. The final thesis longitudinal evaluation may
+    additionally use an expanding or walk-forward protocol.
