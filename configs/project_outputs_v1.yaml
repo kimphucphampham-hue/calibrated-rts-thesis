@@ -1,0 +1,76 @@
+version: 1
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+purpose: >
+  Build compact per-project output packages for the five
+  frozen TCP-CI pilot projects.
+
+inputs:
+  pilot_projects_config: "configs/pilot_projects_v1.yaml"
+
+  history_summary:
+    "results/pilot/history_features/history_feature_summary.csv"
+
+  split_summary:
+    "results/pilot/temporal_split/split_summary.csv"
+
+  baseline_summary:
+    "results/pilot/baseline/baseline_summary.csv"
+
+  pilot_metrics:
+    "results/pilot/metrics/pilot_metrics.csv"
+
+  calibration_bins:
+    "results/pilot/metrics/calibration_bins.csv"
+
+artifact_roots:
+  history:
+    "data/processed/tcp_ci/pilot_history"
+
+  split:
+    "data/processed/tcp_ci/pilot_split"
+
+  baseline:
+    "results/pilot/baseline"
+
+outputs:
+  project_root:
+    "results/pilot/projects"
+
+files:
+  project_summary:
+    "project_summary.json"
+
+  model_metrics:
+    "model_metrics.csv"
+
+  calibration_bins:
+    "calibration_bins.csv"
+
+  artifact_manifest:
+    "artifact_manifest.csv"
+
+  project_index:
+    "project_output_index.csv"
+
+guards:
+  expected_project_count: 5
+  expected_models_per_project: 2
+  duplicate_large_artifacts: false
+
+notes:
+  - >
+    Per-project packages contain compact summaries and
+    diagnostics only.
+
+  - >
+    Large history, train/test, and prediction artifacts remain
+    at their canonical generated locations and are referenced
+    through artifact_manifest.csv.
+
+  - >
+    This packaging stage performs no model fitting, prediction,
+    calibration fitting, or metric recomputation.
