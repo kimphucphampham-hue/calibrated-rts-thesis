@@ -1,0 +1,83 @@
+version: 1
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+purpose: >
+  Minimal probabilistic failure-prediction baseline for the
+  five-project TCP-CI pilot.
+
+inputs:
+  split_root: "data/processed/tcp_ci/pilot_split"
+  pilot_projects_config: "configs/pilot_projects_v1.yaml"
+
+outputs:
+  results_root: "results/pilot/baseline"
+
+target:
+  field: "failed"
+
+evaluation_cost:
+  field: "execution_time_ms"
+  use_as_model_feature: false
+
+features:
+  - failure_rate_history
+  - recent_failure
+  - consecutive_failures
+  - consecutive_passes
+  - test_age_builds
+  - time_since_last_failure_builds
+  - execution_time_mean_history_ms
+
+preprocessing:
+  imputer:
+    strategy: "median"
+    add_indicator: true
+
+  scaler:
+    enabled: true
+
+models:
+  dummy_prior:
+    enabled: true
+    strategy: "prior"
+
+  logistic_regression:
+    enabled: true
+    solver: "lbfgs"
+    C: 1.0
+    max_iter: 2000
+    class_weight: null
+
+evaluation:
+  metrics:
+    - roc_auc
+    - average_precision
+    - brier_score
+    - log_loss
+
+guards:
+  model_fit_split: "train"
+  evaluation_split: "test"
+
+  use_test_for_preprocessor_fit: false
+  use_test_for_model_fit: false
+  use_test_for_feature_selection: false
+  use_test_for_hyperparameter_tuning: false
+  calibration_enabled: false
+
+notes:
+  - >
+    This is a minimal uncalibrated pilot baseline. The resulting
+    probabilities must not be interpreted as the final calibrated
+    probabilities used by the thesis risk-bounded selector.
+
+  - >
+    No hyperparameter search, resampling, SMOTE, feature selection,
+    or probability calibration is performed in baseline v1.
+
+  - >
+    Current-build execution_time_ms is retained only as realized
+    evaluation cost and is never supplied as a model feature.
