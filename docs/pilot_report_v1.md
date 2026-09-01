@@ -10,8 +10,6 @@
 
 ## 1. Pilot objective and success criteria
 
-## 1. Pilot objective and success criteria
-
 The purpose of the five-project pilot is to validate whether
 the proposed TCP-CI experimental pipeline can be executed
 end-to-end on real CI data before scaling to the core thesis
