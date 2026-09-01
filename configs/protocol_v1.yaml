@@ -1,0 +1,185 @@
+protocol:
+  name: "calibrated-risk-bounded-rts"
+  version: "1.0"
+  status: "pilot-frozen-core-planned"
+  dataset: "TCP-CI"
+  dataset_version: "v3"
+
+scope:
+  primary_evidence: "public_real_ci"
+  pilot_project_count: 5
+  core_minimum_projects: 8
+  core_target_projects: 10
+  stretch_target_projects: 25
+
+  synthetic_data_role:
+    - "legacy reproduction"
+    - "pipeline sanity check"
+
+  enterprise_data_required: false
+
+references:
+  canonical_schema: "configs/tcp_ci_schema_v1.yaml"
+  pilot_projects: "configs/pilot_projects_v1.yaml"
+  history_features: "configs/history_features_v1.yaml"
+  temporal_split: "configs/temporal_split_v1.yaml"
+  baseline: "configs/baseline_v1.yaml"
+  pilot_metrics: "configs/pilot_metrics_v1.yaml"
+  project_outputs: "configs/project_outputs_v1.yaml"
+
+observation:
+  staging_granularity: "test_job_execution"
+  canonical_granularity: "test_build"
+
+  canonical_key:
+    - project_id
+    - build_id
+    - test_id
+
+  decision_unit: "test_within_target_build"
+
+target:
+  field: "failed"
+  positive_value: 1
+  negative_value: 0
+
+cost:
+  realized_field: "execution_time_ms"
+  unit: "milliseconds"
+  current_build_cost_available_at: "post_test_execution"
+  current_build_cost_allowed_as_feature: false
+  decision_time_estimate: "execution_time_mean_history_ms"
+
+project_selection:
+  selection_must_be_independent_of_model_performance: true
+
+  required:
+    canonicalization_success: true
+    parseable_build_order: true
+    valid_target: true
+    valid_canonical_key: true
+    usable_execution_cost: true
+    sufficient_temporal_history: true
+
+  pilot_min_train_builds: 100
+  pilot_min_test_builds: 20
+
+features:
+  pilot_feature_set: "history_v1"
+
+  pilot:
+    - failure_rate_history
+    - recent_failure
+    - consecutive_failures
+    - consecutive_passes
+    - test_age_builds
+    - time_since_last_failure_builds
+    - execution_time_mean_history_ms
+
+  future_groups:
+    - change_context
+    - temporal_context
+
+leakage:
+  rule: >
+    Every predictor and decision-time cost estimate for target
+    build b must be derivable exclusively from information
+    available before execution of the target test in build b.
+
+  current_failed_as_feature: false
+  current_execution_time_as_feature: false
+  random_row_split_allowed: false
+
+pilot_evaluation:
+  strategy: "chronological_outer_holdout"
+  train_fraction: 0.80
+  rounding: "floor"
+  role: "pipeline validation only"
+
+core_evaluation:
+  strategy: "walk_forward"
+  random_k_fold_allowed: false
+
+  temporal_rule: >
+    For target build Bt, model fitting, preprocessing,
+    calibration, feature construction, and parameter selection
+    may use only information chronologically available before Bt.
+
+models:
+  pilot:
+    - dummy_prior
+    - logistic_regression
+
+  core_candidates:
+    - logistic_regression
+    - random_forest
+    - gradient_boosting
+
+calibration:
+  status: "planned"
+  methods:
+    - uncalibrated
+    - platt
+    - isotonic
+
+  test_data_used_for_calibrator_fit: false
+
+  rule: >
+    Calibration fitting must use a temporally earlier window
+    separated from the target evaluation build or evaluation
+    window.
+
+risk_bounded_selection:
+  status: "planned"
+
+  rho:
+    - 0.90
+    - 0.95
+    - 0.99
+
+  objective: >
+    Minimize estimated test execution cost subject to retaining
+    at least rho of total predicted failure risk.
+
+  current_realized_execution_time_used_for_selection: false
+
+metrics:
+  prediction:
+    - roc_auc
+    - average_precision
+
+  probability:
+    - brier_score
+    - log_loss
+    - ece
+    - calibration_bias
+    - absolute_calibration_bias
+
+  selection_planned:
+    - failure_recall
+    - test_selection_ratio
+    - runtime_ratio
+    - missed_failure_rate
+
+statistics:
+  primary_unit: "project"
+  descriptive:
+    - median
+    - iqr
+    - bootstrap_95_ci
+
+  paired_test: "wilcoxon_signed_rank"
+  effect_size:
+    - vargha_delaney_a12
+    - cliffs_delta
+
+  multiple_comparison_correction: "holm"
+
+reproducibility:
+  deterministic_project_order: true
+  generated_results_committed: false
+  generated_results_regenerable: true
+
+protocol_change:
+  require_version_increment_for_methodological_change: true
+  document_deviation_before_interpreting_final_results: true
