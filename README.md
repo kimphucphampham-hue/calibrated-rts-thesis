@@ -543,6 +543,26 @@ are recorded in:
 Download the artifact from the official source recorded in
 that manifest.
 
+Create the local download directory:
+
+```bash
+mkdir -p data/raw/tcp_ci/downloads
+```
+
+Download the official artifact:
+
+```bash
+curl -L \
+  "https://zenodo.org/records/6415365/files/TCP-CI-main-dataset.tar.gz?download=1" \
+  -o data/raw/tcp_ci/downloads/TCP-CI-main-dataset.tar.gz
+```
+
+The expected SHA256 is:
+
+```text
+92af159c116e06e98d7c8348605adb6e9acb25aad982a1ff9fbef7103cb9e36e
+```
+
 After downloading, place the archive at:
 
 ```text
