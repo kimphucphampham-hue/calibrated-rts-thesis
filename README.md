@@ -437,6 +437,7 @@ for the full pilot interpretation.
 ```text
 calibrated-rts-thesis/
 ├── configs/
+│   ├── data_sources_v1.yaml
 │   ├── tcp_ci_schema_v1.yaml
 │   ├── pilot_projects_v1.yaml
 │   ├── history_features_v1.yaml
@@ -449,8 +450,13 @@ calibrated-rts-thesis/
 ├── data/
 │   ├── raw/
 │   │   └── tcp_ci/
+│   │       ├── downloads/
+│   │       └── main_dataset/
 │   ├── interim/
 │   └── processed/
+│
+├── scripts/
+│   └── setup_tcp_ci.py
 │
 ├── docs/
 │   ├── protocol_v1.md
@@ -479,6 +485,10 @@ calibrated-rts-thesis/
 ├── .gitignore
 └── README.md
 ```
+
+The raw TCP-CI archive and extracted dataset are excluded from
+Git. Their expected runtime layout is documented in
+[Data placement](#18-data-placement).
 
 ---
 
@@ -510,81 +520,143 @@ All tests should pass before running experimental stages.
 
 ## 18. Data placement
 
-The TCP-CI v3 main dataset is not intended to be duplicated in
-Git.
+The TCP-CI v3 main dataset is an external research artifact
+and is not committed to this Git repository.
 
-Place the downloaded source artifact under the repository's
-raw-data location according to the existing TCP-CI data
-configuration.
+### TCP-CI source artifact
 
-The current repository uses:
+The study uses the following frozen external artifact:
+
+```text
+Dataset:  TCP-CI v3
+Artifact: TCP-CI-main-dataset.tar.gz
+Official source: [Zenodo record 6415365](https://zenodo.org/records/6415365)
+DOI: 10.5281/zenodo.6415365
+SHA256:   92af159c116e06e98d7c8348605adb6e9acb25aad982a1ff9fbef7103cb9e36e
+```
+
+The authoritative external source locator and artifact metadata
+are recorded in:
+
+[`configs/data_sources_v1.yaml`](configs/data_sources_v1.yaml)
+
+Download the artifact from the official source recorded in
+that manifest.
+
+After downloading, place the archive at:
+
+```text
+data/raw/tcp_ci/downloads/TCP-CI-main-dataset.tar.gz
+```
+
+The bootstrap script verifies the archive SHA256 before using
+it. A SHA256 mismatch stops the setup process.
+
+Raw, interim, processed, and generated result artifacts follow
+the repository's `.gitignore` and reproducibility policy.
+
+The archive itself has the following top-level layout:
+
+```text
+datasets/
+├── <project>/
+│   ├── builds.csv
+│   ├── id_map.csv
+│   ├── entity_change_history.csv
+│   ├── dataset.csv
+│   ├── exe.csv
+│   └── ...
+└── ...
+```
+
+Prepare and validate the dataset with:
+
+```bash
+python scripts/setup_tcp_ci.py
+```
+
+The bootstrap extracts the archive into
+`data/raw/tcp_ci/main_dataset/`, producing:
 
 ```text
 data/raw/tcp_ci/
+├── downloads/
+│   └── TCP-CI-main-dataset.tar.gz
+└── main_dataset/
+    └── datasets/
+        ├── camunda@camunda-bpm-platform/
+        │   ├── builds.csv
+        │   ├── id_map.csv
+        │   ├── exe.csv
+        │   └── ...
+        └── ...
 ```
 
-Raw, interim, processed, and generated result artifacts should
-follow the repository's `.gitignore` and reproducibility
-policy.
+The extracted pilot inputs can be verified independently with:
+
+```bash
+python scripts/setup_tcp_ci.py --verify-only
+```
 
 ---
 
 ## 19. Reproducing the five-project pilot
 
-The current pilot pipeline is executed in chronological stage
-order.
+Run the pilot pipeline from the repository root in the
+following stage order.
 
-### 19.1 Canonicalization
+### 19.1 Raw TCP-CI adaptation
 
-Run the TCP-CI pilot adapter and canonical materialization
-stages defined under:
-
-```text
-src/tcp_ci/
+```bash
+python src/tcp_ci/adapt_pilots.py
 ```
 
-The canonical output must satisfy the schema defined in:
+This stage converts the TCP-CI source artifacts into the
+staging test_job_execution representation.
 
-```text
-configs/tcp_ci_schema_v1.yaml
+### 19.2 Canonical materialization
+
+```bash
+python src/tcp_ci/materialize_canonical.py
 ```
 
-### 19.2 Historical features
+The canonical output must satisfy the schema defined in: `configs/tcp_ci_schema_v1.yaml`
+
+### 19.3 Historical features
 
 ```bash
 python src/tcp_ci/build_history_features.py
 ```
 
-### 19.3 Chronological split
+### 19.4 Chronological split
 
 ```bash
 python src/tcp_ci/split_by_build.py
 ```
 
-### 19.4 Probabilistic baselines
+### 19.5 Probabilistic baselines
 
 ```bash
 python src/tcp_ci/run_baseline.py
 ```
 
-### 19.5 Pilot metrics
+### 19.6 Pilot metrics
 
 ```bash
 python src/tcp_ci/evaluate_pilot_metrics.py
 ```
 
-### 19.6 Per-project output packages
+### 19.7 Per-project output packages
 
 ```bash
 python src/tcp_ci/export_project_outputs.py
 ```
 
-### 19.7 Validation
+### 19.8 Validation
 
 ```bash
 python -m pytest -q
 ```
-
 Stage-specific configurations under `configs/` are the
 authoritative source for experiment parameters.
 
@@ -643,6 +715,14 @@ planned core experiments.
 
 Summarizes pilot feasibility, data-quality findings, pilot
 results, limitations, and decisions for the core phase.
+
+### Data source manifest
+
+[`configs/data_sources_v1.yaml`](configs/data_sources_v1.yaml)
+
+Records the frozen TCP-CI dataset version, external artifact
+source, expected SHA256, archive structure, extraction paths,
+and minimum raw-input requirements for the five-project pilot.
 
 ### Canonical schema
 

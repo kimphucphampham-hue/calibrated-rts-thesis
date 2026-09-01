@@ -1,0 +1,30 @@
+tcp_ci:
+  dataset: "TCP-CI"
+  version: "v3"
+
+  artifact:
+    filename: "TCP-CI-main-dataset.tar.gz"
+    externally_hosted: true
+    committed_to_git: false
+    source_url: "https://zenodo.org/records/6415365"
+    doi: "10.5281/zenodo.6415365"
+    sha256: "92af159c116e06e98d7c8348605adb6e9acb25aad982a1ff9fbef7103cb9e36e"
+
+  local_archive:
+    "data/raw/tcp_ci/downloads/TCP-CI-main-dataset.tar.gz"
+
+  extraction_root:
+    "data/raw/tcp_ci/main_dataset"
+
+  project_root:
+    "data/raw/tcp_ci/main_dataset/datasets"
+
+  archive_root:
+    "datasets"
+
+  required_pilot_files:
+    - exe.csv
+    - builds.csv
+    - id_map.csv
+
+  pilot_project_count: 5
