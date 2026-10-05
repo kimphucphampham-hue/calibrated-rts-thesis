@@ -1,0 +1,187 @@
+version: "1.0"
+
+feature_freeze_id: "CORE-FEATURES-v1"
+
+selection_policy:
+  performance_based_feature_selection: false
+
+  decision_basis:
+    - pre_execution_availability
+    - temporal_validity
+    - source_semantics
+    - reproducibility
+    - pilot_data_coverage
+    - leakage_control
+
+primary_feature_set: "F1_F2_F3"
+
+feature_sets:
+
+  F1:
+    description: "Historical per-test baseline features"
+
+    features:
+      - failure_rate_history
+      - recent_failure
+      - consecutive_failures
+      - consecutive_passes
+      - test_age_builds
+      - time_since_last_failure_builds
+      - execution_time_mean_history_ms
+
+  F1_F2:
+    description: "Historical baseline plus build change context"
+
+    features:
+      - failure_rate_history
+      - recent_failure
+      - consecutive_failures
+      - consecutive_passes
+      - test_age_builds
+      - time_since_last_failure_builds
+      - execution_time_mean_history_ms
+      - changed_entity_count
+
+  F1_F2_F3:
+    description: "Full CORE feature set"
+
+    features:
+      - failure_rate_history
+      - recent_failure
+      - consecutive_failures
+      - consecutive_passes
+      - test_age_builds
+      - time_since_last_failure_builds
+      - execution_time_mean_history_ms
+      - changed_entity_count
+      - build_index
+      - recent_failure_density_10
+      - execution_time_trend_10
+
+
+feature_definitions:
+
+  changed_entity_count:
+    group: "F2"
+    data_type: "integer"
+
+    source:
+      - "builds.csv:commits"
+      - "entity_change_history.csv:Commit"
+      - "entity_change_history.csv:EntityId"
+
+    derivation: >
+      Count distinct EntityId values across all entity-change
+      records associated with all commits linked to the target
+      build.
+
+    temporal_rule: >
+      Every matched change record used for a target build must
+      satisfy CommitDate <= build_started_at. If any matched
+      change record violates this condition, this feature is
+      unavailable for the entire build.
+
+    unmatched_commit_policy: "missing"
+
+    duplicate_policy: >
+      Count EntityId using distinct/nunique semantics. Duplicate
+      or conflicting line-count records do not increase this
+      count.
+
+
+  build_index:
+    group: "F3"
+    data_type: "integer"
+
+    derivation: >
+      Chronological dense build index within project ordered by
+      build_started_at, with build_id as deterministic tie
+      breaker.
+
+    temporal_rule: "available before target test execution"
+
+
+  recent_failure_density_10:
+    group: "F3"
+    data_type: "float"
+
+    window_type: "previous_observed_executions_same_test"
+    window_size: 10
+    minimum_history: 10
+
+    derivation: >
+      Arithmetic mean of failed over the previous 10 observed
+      executions of the same test.
+
+    temporal_rule: >
+      All contributing observations must have build_index
+      strictly less than the target build_index.
+
+    insufficient_history_policy: "missing"
+
+
+  execution_time_trend_10:
+    group: "F3"
+    data_type: "float"
+    unit: "milliseconds_per_build_index"
+
+    window_type: "previous_observed_executions_same_test"
+    window_size: 10
+    minimum_history: 10
+
+    derivation: >
+      Ordinary least-squares slope of historical
+      execution_time_ms against build_index using the previous
+      10 observed executions of the same test.
+
+    temporal_rule: >
+      All contributing observations must have build_index
+      strictly less than the target build_index.
+
+    insufficient_history_policy: "missing"
+
+
+excluded_current_build_fields:
+  - failed
+  - execution_time_ms
+  - verdict_raw
+  - duration_raw
+
+
+excluded_core_v1_candidates:
+
+  change_added_lines:
+    reason: >
+      Conflicting duplicate (Commit, EntityId) records prevent
+      a defensible deterministic line-count aggregation rule.
+
+  change_deleted_lines:
+    reason: >
+      Conflicting duplicate (Commit, EntityId) records prevent
+      a defensible deterministic line-count aggregation rule.
+
+  change_churn:
+    reason: >
+      Depends on unresolved AddedLines/DeletedLines aggregation
+      semantics.
+
+  changed_files_count:
+    reason: >
+      The artifact establishes EntityId-to-repository-path
+      mapping, but CORE v1 conservatively uses the semantics
+      changed_entity_count.
+
+  complexity:
+    reason: >
+      Precomputed dataset.csv features cover only a failed-build
+      subset rather than the complete all-build RQ1 population.
+
+  dependency_score:
+    reason: >
+      No validated dependency source is available in the frozen
+      local TCP-CI artifact.
+
+  coverage_to_change:
+    reason: >
+      Temporal semantics are not sufficiently established for
+      inclusion in CORE v1.
