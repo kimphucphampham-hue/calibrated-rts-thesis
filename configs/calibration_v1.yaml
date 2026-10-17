@@ -1,0 +1,144 @@
+version: 1
+
+purpose: >
+  Frozen probability-calibration design for RQ1.
+
+methods:
+  - uncalibrated
+  - platt
+  - isotonic
+
+chronology:
+  required_order:
+    - model_fit
+    - calibration
+    - evaluation
+
+  rule: >
+    model-fit period < calibration period < evaluation period
+
+  evaluation_labels_used_for_calibration_fit: false
+  evaluation_predictions_used_for_calibration_fit: false
+
+calibration_scope:
+  project_specific: true
+  model_specific: true
+
+  shared_across_projects: false
+  shared_across_models: false
+
+base_probability:
+  definition: >
+    Positive-class raw probability produced by the fitted base
+    model for an observation.
+
+  interface: "predict_proba_positive_class"
+
+uncalibrated:
+  output: "base_probability"
+
+platt:
+  input: "base_probability"
+
+  epsilon: 0.000001
+
+  transform: >
+    logit(clip(base_probability, epsilon, 1 - epsilon))
+
+  definition: >
+    Fit parameters a and b on the calibration partition so that
+
+      calibrated_probability =
+        sigmoid(a * logit(clipped_base_probability) + b)
+
+    Parameters are estimated by minimizing binary log loss on
+    calibration observations only.
+
+  hyperparameter_tuning: false
+
+isotonic:
+  input: "base_probability"
+
+  monotonic_direction: "increasing"
+  out_of_bounds: "clip"
+
+  definition: >
+    Fit a monotonic non-decreasing isotonic regression mapping
+    from base probability to observed binary failure outcome
+    using calibration observations only.
+
+rare_event_policy:
+  initial_calibration_window: >
+    Final 20 percent of the chronological development period.
+
+  expansion:
+    enabled: true
+    direction: "backward"
+    step: "one_build"
+
+  minimum_support:
+    positive_rows: 5
+    negative_rows: 5
+    failing_builds: 2
+    passing_builds: 2
+
+  minimum_model_fit_builds: 100
+
+  stop_rule: >
+    Stop expansion at the first calibration window satisfying
+    every minimum-support requirement.
+
+  outer_evaluation_may_be_consumed: false
+
+  insufficient_support_action:
+    uncalibrated: "run"
+    platt: "skip_with_status"
+    isotonic: "skip_with_status"
+
+  skip_status: "INSUFFICIENT_CALIBRATION_SUPPORT"
+
+metrics:
+  source_config: "configs/pilot_metrics_v1.yaml"
+
+  ece:
+    n_bins: 10
+    strategy: "equal_width"
+    lower_bound: 0.0
+    upper_bound: 1.0
+    empty_bins_contribute: false
+
+  calibration_bias:
+    definition: >
+      mean(predicted_probability) - observed_failure_prevalence
+
+    positive_interpretation: "average over-estimation"
+    negative_interpretation: "average under-estimation"
+
+  absolute_calibration_bias:
+    definition: >
+      abs(calibration_bias)
+
+reliability_diagram:
+  enabled: true
+
+  binning:
+    n_bins: 10
+    strategy: "equal_width"
+    lower_bound: 0.0
+    upper_bound: 1.0
+
+  x_axis: "mean_predicted_probability"
+  y_axis: "observed_failure_frequency"
+
+  reference_line: "y=x"
+
+  empty_bins: "omit"
+
+  generation_rule: >
+    Reliability diagrams must be generated from saved
+    calibration-bin outputs rather than from independently
+    recomputed bin definitions.
+
+freeze_policy:
+  performance_based_window_selection: false
+  performance_based_calibration_method_selection: false

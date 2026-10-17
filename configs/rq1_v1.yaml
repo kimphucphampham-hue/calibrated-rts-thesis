@@ -1,0 +1,137 @@
+version: 1
+
+rq:
+  id: "RQ1"
+  title: "Probability estimation and calibration"
+
+scope:
+  role: "five-project pilot RQ1 pipeline validation"
+  primary_final_evidence: false
+
+references:
+  protocol: "configs/protocol_v1.yaml"
+  features: "configs/core_features_v1.yaml"
+  outer_split: "configs/temporal_split_v1.yaml"
+  metrics: "configs/pilot_metrics_v1.yaml"
+  calibration: "configs/calibration_v1.yaml"
+
+feature_set:
+  name: "F1_F2_F3"
+  config: "configs/core_features_v1.yaml"
+
+models:
+  - logistic_regression
+  - random_forest
+  - xgboost
+
+model_policy:
+  hyperparameter_tuning: false
+  feature_selection_from_model_results: false
+  exact_parameters_must_be_frozen_before_first_model_run: true
+
+temporal_design:
+  split_unit: "build"
+  ordering: "chronological"
+  ordering_field: "build_index"
+  random_split: false
+  label_stratification: false
+
+  outer:
+    development_fraction: 0.80
+    evaluation_fraction: 0.20
+    rounding: "floor"
+    evaluation_boundary_immutable: true
+
+  inner_initial:
+    model_fit_fraction_of_development: 0.80
+    calibration_fraction_of_development: 0.20
+    rounding: "floor"
+
+  calibration_expansion:
+    enabled: true
+    direction: "backward_in_time"
+    step_unit: "one_build"
+    stop_at_first_sufficient_window: true
+
+    minimum_support:
+      positive_rows: 5
+      negative_rows: 5
+      failing_builds: 2
+      passing_builds: 2
+
+    minimum_model_fit_builds: 100
+
+    evaluation_builds_may_be_used: false
+
+preprocessing:
+  fit_period: "model_fit_only"
+  calibration_period_may_fit_preprocessing: false
+  evaluation_period_may_fit_preprocessing: false
+
+  rule: >
+    Preprocessing parameters are fitted only on the model-fit
+    partition and then applied unchanged to calibration and
+    evaluation observations.
+
+pilot_retraining:
+  enabled: false
+
+  rule: >
+    For each project and model, the base model is fitted once
+    on the final model-fit partition. The calibrator is then
+    fitted once on the calibration partition. Both are evaluated
+    on the untouched outer evaluation partition.
+
+calibration_variants:
+  - uncalibrated
+  - platt
+  - isotonic
+
+metrics:
+  discrimination:
+    - roc_auc
+    - average_precision
+
+  probability:
+    - brier_score
+    - log_loss
+
+  calibration:
+    - ece
+    - mean_predicted_probability
+    - calibration_bias
+    - absolute_calibration_bias
+
+threshold_dependent_classification_metrics:
+  enabled: false
+
+  reason: >
+    RQ1 v1 does not define a binary classification threshold.
+    Failure Recall is evaluated later under the explicit
+    selection decision rules used for RQ2.
+
+reporting:
+  primary_unit: "project"
+
+  pool_all_project_rows_as_primary_result: false
+
+  expected_conditions_per_project:
+    models: 3
+    calibration_variants: 3
+    maximum_conditions: 9
+
+undefined_metric_policy:
+  value: "NA"
+
+  rule: >
+    A metric that is mathematically undefined because the
+    evaluation observations contain insufficient class support
+    is reported as NA rather than replaced by an arbitrary
+    numeric value.
+
+freeze_policy:
+  result_driven_method_changes_allowed: false
+
+  rule: >
+    Changes after this freeze require a documented protocol
+    amendment and rerunning all affected RQ1 experiments.
