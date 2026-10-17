@@ -7,18 +7,32 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
     log_loss,
     roc_auc_score,
 )
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+
+
+try:
+    from src.tcp_ci.model_runner import (
+        build_logistic_pipeline,
+        fit_probability_model,
+        positive_probability,
+        validate_feature_list,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "src":
+        raise
+
+    from model_runner import (
+        build_logistic_pipeline,
+        fit_probability_model,
+        positive_probability,
+        validate_feature_list,
+    )
 
 
 DEFAULT_CONFIG = Path(
@@ -50,39 +64,6 @@ def safe_project_name(
         .replace("/", "__")
         .replace("@", "__")
     )
-
-
-def validate_feature_list(
-    features: list[str],
-) -> None:
-    forbidden = {
-        "failed",
-        "execution_time_ms",
-        "verdict_raw",
-        "duration_raw",
-        "split",
-    }
-
-    overlap = (
-        set(features)
-        & forbidden
-    )
-
-    if overlap:
-        raise ValueError(
-            "Forbidden post-execution/model-control "
-            "fields found in feature list: "
-            + ", ".join(
-                sorted(overlap)
-            )
-        )
-
-    if len(features) != len(
-        set(features)
-    ):
-        raise ValueError(
-            "Duplicate feature names found."
-        )
 
 
 def load_split(
@@ -242,88 +223,6 @@ def validate_train_test(
         )
 
 
-def build_logistic_pipeline(
-    feature_columns: list[str],
-    config: dict,
-) -> Pipeline:
-    preprocessing = config[
-        "preprocessing"
-    ]
-
-    model_config = config[
-        "models"
-    ][
-        "logistic_regression"
-    ]
-
-    numeric_pipeline = Pipeline(
-        steps=[
-            (
-                "imputer",
-                SimpleImputer(
-                    strategy=preprocessing[
-                        "imputer"
-                    ][
-                        "strategy"
-                    ],
-                    add_indicator=bool(
-                        preprocessing[
-                            "imputer"
-                        ][
-                            "add_indicator"
-                        ]
-                    ),
-                ),
-            ),
-            (
-                "scaler",
-                StandardScaler(),
-            ),
-        ]
-    )
-
-    transformer = ColumnTransformer(
-        transformers=[
-            (
-                "history",
-                numeric_pipeline,
-                feature_columns,
-            ),
-        ],
-        remainder="drop",
-    )
-
-    model = LogisticRegression(
-        solver=model_config[
-            "solver"
-        ],
-        C=float(
-            model_config["C"]
-        ),
-        max_iter=int(
-            model_config[
-                "max_iter"
-            ]
-        ),
-        class_weight=model_config[
-            "class_weight"
-        ],
-    )
-
-    return Pipeline(
-        steps=[
-            (
-                "preprocess",
-                transformer,
-            ),
-            (
-                "model",
-                model,
-            ),
-        ]
-    )
-
-
 def evaluate_probabilities(
     y_true: pd.Series,
     probability: np.ndarray,
@@ -404,42 +303,6 @@ def evaluate_probabilities(
                 )
             ),
     }
-
-
-def positive_probability(
-    model,
-    dataframe: pd.DataFrame,
-) -> np.ndarray:
-    probabilities = (
-        model.predict_proba(
-            dataframe
-        )
-    )
-
-    classes = list(
-        model.classes_
-        if hasattr(
-            model,
-            "classes_",
-        )
-        else model[
-            "model"
-        ].classes_
-    )
-
-    if 1 not in classes:
-        raise ValueError(
-            "Positive class 1 not found."
-        )
-
-    positive_index = (
-        classes.index(1)
-    )
-
-    return probabilities[
-        :,
-        positive_index,
-    ]
 
 
 def run_project(
@@ -574,22 +437,17 @@ def run_project(
         )
     )
 
-    logistic.fit(
+    fit_probability_model(
+        logistic,
         X_train,
         y_train,
     )
 
     logistic_probability = (
-        logistic.predict_proba(
-            X_test
-        )[
-            :,
-            list(
-                logistic[
-                    "model"
-                ].classes_
-            ).index(1),
-        ]
+        positive_probability(
+            logistic,
+            X_test,
+        )
     )
 
     # -------------------------------------------------
