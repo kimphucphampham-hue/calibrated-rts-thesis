@@ -1,0 +1,102 @@
+version: 1
+
+validation:
+  id: "RQ1-TARGETED-FEATURE-ABLATION-v1"
+
+  role: >
+    Supplementary five-project targeted validation of the
+    frozen CORE feature groups.
+
+  primary_final_evidence: false
+
+  result_role: "supplementary_sensitivity_analysis"
+
+references:
+  rq1: "configs/rq1_v1.yaml"
+  core_features: "configs/core_features_v1.yaml"
+  models: "configs/rq1_models_v1.yaml"
+  calibration: "configs/calibration_v1.yaml"
+  outer_split: "configs/temporal_split_v1.yaml"
+
+feature_ablation:
+  enabled: true
+
+  comparison_order:
+    - "F1"
+    - "F1_F2"
+    - "F1_F2_F3"
+
+  primary_feature_set_remains:
+    "F1_F2_F3"
+
+  feature_selection_from_results: false
+
+  interpretation: >
+    Compare the predefined frozen feature groups without
+    changing the primary CORE feature set.
+
+models:
+  - "logistic_regression"
+  - "random_forest"
+  - "xgboost"
+
+calibration_variants:
+  - "uncalibrated"
+  - "platt"
+  - "isotonic"
+
+temporal_design:
+  reuse_rq1_v1: true
+
+  outer_evaluation_boundary_unchanged: true
+  calibration_window_rule_unchanged: true
+  minimum_support_rule_unchanged: true
+
+  evaluation_used_for_model_fit: false
+  evaluation_used_for_calibration_fit: false
+  evaluation_used_for_feature_selection: false
+
+retraining:
+  enabled: false
+
+reporting:
+  primary_unit: "project"
+
+  pool_all_project_rows_as_primary_result: false
+
+  comparison_unit:
+    - "project_id"
+    - "model"
+    - "calibration_variant"
+
+  comparison_factor:
+    "feature_set"
+
+expected_grid:
+  projects: 5
+  feature_sets: 3
+  models: 3
+  calibration_variants: 3
+  maximum_conditions: 135
+
+result_policy:
+  select_best_feature_set: false
+  select_best_model: false
+  select_best_calibration_method: false
+
+  change_primary_feature_set_from_results: false
+
+  final_thesis_claims_allowed: false
+
+  rule: >
+    Results from this targeted validation are supplementary
+    pilot evidence only. They must not be presented as the
+    primary longitudinal RQ1 result.
+
+freeze_policy:
+  result_driven_changes_allowed: false
+
+  rule: >
+    The complete targeted-validation grid and interpretation
+    rules are frozen before executing feature-ablation
+    performance runs.
