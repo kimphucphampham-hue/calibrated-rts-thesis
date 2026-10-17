@@ -508,6 +508,13 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+On macOS, XGBoost also requires the OpenMP runtime.
+If `libomp.dylib` is unavailable, install it with Homebrew:
+
+```bash
+brew install libomp
+```
+
 Verify the repository:
 
 ```bash

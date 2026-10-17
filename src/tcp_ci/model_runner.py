@@ -8,6 +8,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 
@@ -191,6 +192,93 @@ def build_random_forest_estimator(
         ),
     )
 
+def build_xgboost_estimator(
+    model_config: dict,
+) -> XGBClassifier:
+    return XGBClassifier(
+        objective=str(
+            model_config[
+                "objective"
+            ]
+        ),
+        booster=str(
+            model_config[
+                "booster"
+            ]
+        ),
+        n_estimators=int(
+            model_config[
+                "n_estimators"
+            ]
+        ),
+        learning_rate=float(
+            model_config[
+                "learning_rate"
+            ]
+        ),
+        max_depth=int(
+            model_config[
+                "max_depth"
+            ]
+        ),
+        min_child_weight=float(
+            model_config[
+                "min_child_weight"
+            ]
+        ),
+        gamma=float(
+            model_config[
+                "gamma"
+            ]
+        ),
+        subsample=float(
+            model_config[
+                "subsample"
+            ]
+        ),
+        colsample_bytree=float(
+            model_config[
+                "colsample_bytree"
+            ]
+        ),
+        reg_alpha=float(
+            model_config[
+                "reg_alpha"
+            ]
+        ),
+        reg_lambda=float(
+            model_config[
+                "reg_lambda"
+            ]
+        ),
+        scale_pos_weight=float(
+            model_config[
+                "scale_pos_weight"
+            ]
+        ),
+        tree_method=str(
+            model_config[
+                "tree_method"
+            ]
+        ),
+        random_state=int(
+            model_config[
+                "random_state"
+            ]
+        ),
+        n_jobs=int(
+            model_config[
+                "n_jobs"
+            ]
+        ),
+        eval_metric=str(
+            model_config[
+                "eval_metric"
+            ]
+        ),
+    )
+
+
 def build_probability_pipeline(
     feature_columns: list[str],
     preprocessing_config: dict,
@@ -262,6 +350,29 @@ def build_random_forest_pipeline(
         ],
         estimator=estimator,
     )
+
+def build_xgboost_pipeline(
+    feature_columns: list[str],
+    config: dict,
+) -> Pipeline:
+    estimator = (
+        build_xgboost_estimator(
+            config[
+                "models"
+            ][
+                "xgboost"
+            ]
+        )
+    )
+
+    return build_probability_pipeline(
+        feature_columns=feature_columns,
+        preprocessing_config=config[
+            "preprocessing"
+        ],
+        estimator=estimator,
+    )
+
 
 def fit_probability_model(
     model,

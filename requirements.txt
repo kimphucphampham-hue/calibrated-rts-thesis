@@ -6,3 +6,4 @@ PyYAML
 joblib
 matplotlib
 pytest
+xgboost

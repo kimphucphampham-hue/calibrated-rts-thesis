@@ -5,6 +5,7 @@ import yaml
 from src.tcp_ci.model_runner import (
     build_logistic_pipeline,
     build_random_forest_pipeline,
+    build_xgboost_pipeline,
     fit_probability_model,
     positive_probability,
     validate_feature_list,
@@ -317,3 +318,116 @@ def test_random_forest_parameters_match_frozen_config():
     assert estimator.class_weight is None
     assert estimator.random_state == 42
     assert estimator.n_jobs == -1
+
+
+def test_xgboost_runner_returns_valid_probabilities():
+    config = load_rq1_config()
+    X, y = make_data()
+
+    model = build_xgboost_pipeline(
+        FEATURES,
+        config,
+    )
+
+    fitted = fit_probability_model(
+        model,
+        X,
+        y,
+    )
+
+    probability = positive_probability(
+        fitted,
+        X,
+    )
+
+    assert len(probability) == len(X)
+
+    assert np.isfinite(
+        probability
+    ).all()
+
+    assert (
+        probability >= 0.0
+    ).all()
+
+    assert (
+        probability <= 1.0
+    ).all()
+
+
+def test_xgboost_parameters_match_frozen_config():
+    config = load_rq1_config()
+
+    model = build_xgboost_pipeline(
+        FEATURES,
+        config,
+    )
+
+    estimator = model["model"]
+    params = estimator.get_params()
+
+    expected = {
+        "objective": "binary:logistic",
+        "booster": "gbtree",
+        "n_estimators": 100,
+        "learning_rate": 0.3,
+        "max_depth": 6,
+        "min_child_weight": 1.0,
+        "gamma": 0.0,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+        "reg_alpha": 0.0,
+        "reg_lambda": 1.0,
+        "scale_pos_weight": 1.0,
+        "tree_method": "hist",
+        "random_state": 42,
+        "n_jobs": -1,
+        "eval_metric": "logloss",
+    }
+
+    for name, value in expected.items():
+        assert params[name] == value
+
+
+def test_xgboost_runner_is_deterministic():
+    config = load_rq1_config()
+    X, y = make_data()
+
+    model_1 = build_xgboost_pipeline(
+        FEATURES,
+        config,
+    )
+
+    model_2 = build_xgboost_pipeline(
+        FEATURES,
+        config,
+    )
+
+    fitted_1 = fit_probability_model(
+        model_1,
+        X,
+        y,
+    )
+
+    fitted_2 = fit_probability_model(
+        model_2,
+        X,
+        y,
+    )
+
+    probability_1 = positive_probability(
+        fitted_1,
+        X,
+    )
+
+    probability_2 = positive_probability(
+        fitted_2,
+        X,
+    )
+
+    np.testing.assert_allclose(
+        probability_1,
+        probability_2,
+        rtol=0.0,
+        atol=0.0,
+    )
