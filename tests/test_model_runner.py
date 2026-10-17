@@ -4,6 +4,7 @@ import yaml
 
 from src.tcp_ci.model_runner import (
     build_logistic_pipeline,
+    build_random_forest_pipeline,
     fit_probability_model,
     positive_probability,
     validate_feature_list,
@@ -24,6 +25,15 @@ FEATURES = [
 def load_config():
     with open(
         "configs/baseline_v1.yaml",
+        "r",
+        encoding="utf-8",
+    ) as file:
+        return yaml.safe_load(file)
+
+
+def load_rq1_config():
+    with open(
+        "configs/rq1_models_v1.yaml",
         "r",
         encoding="utf-8",
     ) as file:
@@ -250,3 +260,60 @@ def test_prediction_does_not_refit_preprocessor():
         before,
         after,
     )
+
+
+def test_random_forest_runner_returns_valid_probabilities():
+    config = load_rq1_config()
+    X, y = make_data()
+
+    model = build_random_forest_pipeline(
+        FEATURES,
+        config,
+    )
+
+    fitted = fit_probability_model(
+        model,
+        X,
+        y,
+    )
+
+    probability = positive_probability(
+        fitted,
+        X,
+    )
+
+    assert len(probability) == len(X)
+
+    assert np.isfinite(
+        probability
+    ).all()
+
+    assert (
+        probability >= 0.0
+    ).all()
+
+    assert (
+        probability <= 1.0
+    ).all()
+
+
+def test_random_forest_parameters_match_frozen_config():
+    config = load_rq1_config()
+
+    model = build_random_forest_pipeline(
+        FEATURES,
+        config,
+    )
+
+    estimator = model["model"]
+
+    assert estimator.n_estimators == 100
+    assert estimator.criterion == "gini"
+    assert estimator.max_depth is None
+    assert estimator.min_samples_split == 2
+    assert estimator.min_samples_leaf == 1
+    assert estimator.max_features == "sqrt"
+    assert estimator.bootstrap is True
+    assert estimator.class_weight is None
+    assert estimator.random_state == 42
+    assert estimator.n_jobs == -1

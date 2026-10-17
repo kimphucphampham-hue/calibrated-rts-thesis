@@ -21,7 +21,13 @@ FEATURE_COLUMNS = [
     "test_age_builds",
     "time_since_last_failure_builds",
     "execution_time_mean_history_ms",
+    "changed_entity_count",
+    "recent_failure_density_10",
+    "execution_time_trend_10",
 ]
+
+
+HISTORY_WINDOW = 10
 
 
 SUPPORT_COLUMNS = [
@@ -352,6 +358,144 @@ def compute_history_features(
     )
 
     # -------------------------------------------------
+    # Recent failure density over the previous
+    # HISTORY_WINDOW observed executions.
+    #
+    # shift(1) removes the current target observation.
+    # -------------------------------------------------
+
+    previous_failed = (
+        result
+        .groupby(
+            HISTORY_GROUP_KEYS,
+            sort=False,
+        )["failed"]
+        .shift(1)
+    )
+
+    history_groupers = [
+        result["project_id"],
+        result["test_id"],
+    ]
+
+    result[
+        "recent_failure_density_10"
+    ] = (
+        previous_failed
+        .groupby(
+            history_groupers,
+            sort=False,
+        )
+        .rolling(
+            window=HISTORY_WINDOW,
+            min_periods=HISTORY_WINDOW,
+        )
+        .mean()
+        .reset_index(
+            level=[0, 1],
+            drop=True,
+        )
+        .sort_index()
+    )
+
+    # -------------------------------------------------
+    # Execution-time trend over the previous
+    # HISTORY_WINDOW observed executions.
+    #
+    # OLS slope:
+    #
+    #   (n * sum(xy) - sum(x) * sum(y))
+    #   ---------------------------------
+    #   (n * sum(x^2) - sum(x)^2)
+    #
+    # x = build_index
+    # y = execution_time_ms
+    #
+    # Current observation is excluded by shift(1).
+    # -------------------------------------------------
+
+    previous_build_index = (
+        result
+        .groupby(
+            HISTORY_GROUP_KEYS,
+            sort=False,
+        )["build_index"]
+        .shift(1)
+        .astype(float)
+    )
+
+    previous_duration = (
+        result
+        .groupby(
+            HISTORY_GROUP_KEYS,
+            sort=False,
+        )["execution_time_ms"]
+        .shift(1)
+        .astype(float)
+    )
+
+    def rolling_sum(
+        series: pd.Series,
+    ) -> pd.Series:
+        return (
+            series
+            .groupby(
+                history_groupers,
+                sort=False,
+            )
+            .rolling(
+                window=HISTORY_WINDOW,
+                min_periods=HISTORY_WINDOW,
+            )
+            .sum()
+            .reset_index(
+                level=[0, 1],
+                drop=True,
+            )
+            .sort_index()
+        )
+
+    sum_x = rolling_sum(
+        previous_build_index
+    )
+
+    sum_y = rolling_sum(
+        previous_duration
+    )
+
+    sum_x2 = rolling_sum(
+        previous_build_index
+        * previous_build_index
+    )
+
+    sum_xy = rolling_sum(
+        previous_build_index
+        * previous_duration
+    )
+
+    n = float(HISTORY_WINDOW)
+
+    slope_denominator = (
+        n * sum_x2
+        - sum_x * sum_x
+    )
+
+    slope_numerator = (
+        n * sum_xy
+        - sum_x * sum_y
+    )
+
+    result[
+        "execution_time_trend_10"
+    ] = (
+        slope_numerator
+        / slope_denominator.replace(
+            0.0,
+            np.nan,
+        )
+    )
+
+    # -------------------------------------------------
     # Consecutive failure/pass streak immediately
     # before the current execution.
     # -------------------------------------------------
@@ -520,6 +664,83 @@ def compute_history_features(
             "Cold-start pass streak must be zero."
         )
 
+    insufficient_window = (
+        result[
+            "prior_execution_count"
+        ] < HISTORY_WINDOW
+    )
+
+    sufficient_window = (
+        result[
+            "prior_execution_count"
+        ] >= HISTORY_WINDOW
+    )
+
+    if not (
+        result.loc[
+            insufficient_window,
+            "recent_failure_density_10",
+        ]
+        .isna()
+        .all()
+    ):
+        raise AssertionError(
+            "Recent failure density must be "
+            "missing before 10 prior executions."
+        )
+
+    if not (
+        result.loc[
+            insufficient_window,
+            "execution_time_trend_10",
+        ]
+        .isna()
+        .all()
+    ):
+        raise AssertionError(
+            "Execution-time trend must be "
+            "missing before 10 prior executions."
+        )
+
+    if (
+        result.loc[
+            sufficient_window,
+            "recent_failure_density_10",
+        ]
+        .isna()
+        .any()
+    ):
+        raise AssertionError(
+            "Recent failure density unexpectedly missing."
+        )
+
+    observed_density = (
+        result[
+            "recent_failure_density_10"
+        ]
+        .dropna()
+    )
+
+    if not observed_density.between(
+        0.0,
+        1.0,
+    ).all():
+        raise AssertionError(
+            "Recent failure density outside [0, 1]."
+        )
+
+    if (
+        result.loc[
+            sufficient_window,
+            "execution_time_trend_10",
+        ]
+        .isna()
+        .any()
+    ):
+        raise AssertionError(
+            "Execution-time trend unexpectedly missing."
+        )
+
     required_with_history = [
         "failure_rate_history",
         "recent_failure",
@@ -602,6 +823,259 @@ def compute_history_features(
 
     return result
 
+def parse_commit_tokens(
+    value,
+) -> list[str]:
+    if pd.isna(value):
+        return []
+
+    return [
+        token.strip()
+        for token in str(value).split("#")
+        if token.strip()
+    ]
+
+
+def compute_changed_entity_count(
+    canonical: pd.DataFrame,
+    raw_project_dir: Path,
+) -> pd.DataFrame:
+    builds_path = (
+        raw_project_dir
+        / "builds.csv"
+    )
+
+    changes_path = (
+        raw_project_dir
+        / "entity_change_history.csv"
+    )
+
+    if not builds_path.exists():
+        raise FileNotFoundError(
+            builds_path
+        )
+
+    if not changes_path.exists():
+        raise FileNotFoundError(
+            changes_path
+        )
+
+    builds = pd.read_csv(
+        builds_path,
+        dtype={
+            "id": "string",
+            "commits": "string",
+        },
+        low_memory=False,
+    )
+
+    changes = pd.read_csv(
+        changes_path,
+        dtype={
+            "Commit": "string",
+        },
+        low_memory=False,
+    )
+
+    required_build_columns = {
+        "id",
+        "commits",
+        "started_at",
+    }
+
+    required_change_columns = {
+        "Commit",
+        "CommitDate",
+        "EntityId",
+    }
+
+    missing_build_columns = (
+        required_build_columns
+        - set(builds.columns)
+    )
+
+    if missing_build_columns:
+        raise ValueError(
+            "builds.csv missing required columns: "
+            + ", ".join(
+                sorted(
+                    missing_build_columns
+                )
+            )
+        )
+
+    missing_change_columns = (
+        required_change_columns
+        - set(changes.columns)
+    )
+
+    if missing_change_columns:
+        raise ValueError(
+            "entity_change_history.csv "
+            "missing required columns: "
+            + ", ".join(
+                sorted(
+                    missing_change_columns
+                )
+            )
+        )
+
+    builds["id"] = (
+        builds["id"]
+        .astype("string")
+    )
+
+    builds["started_at"] = (
+        pd.to_datetime(
+            builds["started_at"],
+            utc=True,
+            errors="raise",
+        )
+    )
+
+    changes["Commit"] = (
+        changes["Commit"]
+        .astype("string")
+    )
+
+    changes["CommitDate"] = (
+        pd.to_datetime(
+            changes["CommitDate"],
+            utc=True,
+            errors="raise",
+        )
+    )
+
+    canonical_builds = (
+        canonical[
+            [
+                "build_id",
+                "build_started_at",
+            ]
+        ]
+        .drop_duplicates()
+        .copy()
+    )
+
+    canonical_builds[
+        "build_id"
+    ] = (
+        canonical_builds[
+            "build_id"
+        ]
+        .astype("string")
+    )
+
+    canonical_builds[
+        "build_started_at"
+    ] = pd.to_datetime(
+        canonical_builds[
+            "build_started_at"
+        ],
+        utc=True,
+        errors="raise",
+    )
+
+    raw_builds = (
+        builds[
+            [
+                "id",
+                "commits",
+                "started_at",
+            ]
+        ]
+        .rename(
+            columns={
+                "id": "build_id",
+                "started_at":
+                    "raw_build_started_at",
+            }
+        )
+    )
+
+    build_context = (
+        canonical_builds
+        .merge(
+            raw_builds,
+            on="build_id",
+            how="left",
+            validate="one_to_one",
+        )
+    )
+
+    result_rows = []
+
+    changes_by_commit = {
+        commit: frame
+        for commit, frame in changes.groupby(
+            "Commit",
+            sort=False,
+        )
+    }
+
+    for row in build_context.itertuples(
+        index=False
+    ):
+        commits = parse_commit_tokens(
+            row.commits
+        )
+
+        feature_value = np.nan
+
+        if commits:
+            matched_frames = []
+            all_commits_matched = True
+
+            for commit in commits:
+                frame = (
+                    changes_by_commit.get(
+                        commit
+                    )
+                )
+
+                if frame is None:
+                    all_commits_matched = False
+                    break
+
+                matched_frames.append(
+                    frame
+                )
+
+            if all_commits_matched:
+                matched = pd.concat(
+                    matched_frames,
+                    ignore_index=True,
+                )
+
+                has_future_change = (
+                    matched[
+                        "CommitDate"
+                    ]
+                    > row.build_started_at
+                ).any()
+
+                if not has_future_change:
+                    feature_value = float(
+                        matched[
+                            "EntityId"
+                        ]
+                        .nunique(
+                            dropna=True
+                        )
+                    )
+
+        result_rows.append(
+            {
+                "build_id":
+                    str(row.build_id),
+                "changed_entity_count":
+                    feature_value,
+            }
+        )
+
+    return pd.DataFrame(
+        result_rows
+    )
 
 def build_project(
     project_key: str,
@@ -639,11 +1113,63 @@ def build_project(
         low_memory=False,
     )
 
+    data_sources = load_yaml(
+        Path(
+            config[
+                "inputs"
+            ][
+                "data_sources_config"
+            ]
+        )
+    )
+
+    raw_project_root = Path(
+        data_sources[
+            "tcp_ci"
+        ][
+            "project_root"
+        ]
+    )
+
+    raw_project_name = (
+        project_key.removeprefix(
+            "datasets/"
+        )
+    )
+
+    raw_project_dir = (
+        raw_project_root
+        / raw_project_name
+    )
+
     featured = (
         compute_history_features(
             canonical
         )
     )
+
+    change_features = (
+        compute_changed_entity_count(
+            canonical=canonical,
+            raw_project_dir=raw_project_dir,
+        )
+    )
+
+    featured = (
+        featured
+        .merge(
+            change_features,
+            on="build_id",
+            how="left",
+            validate="many_to_one",
+        )
+    )
+
+    if len(featured) != len(canonical):
+        raise AssertionError(
+            "Row count changed while adding "
+            "changed_entity_count."
+        )
 
     cold_start_rows = int(
         (

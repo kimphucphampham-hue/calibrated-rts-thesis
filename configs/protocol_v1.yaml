@@ -24,6 +24,7 @@ references:
   history_features: "configs/history_features_v1.yaml"
   temporal_split: "configs/temporal_split_v1.yaml"
   baseline: "configs/baseline_v1.yaml"
+  rq1_models: "configs/rq1_models_v1.yaml"
   pilot_metrics: "configs/pilot_metrics_v1.yaml"
   project_outputs: "configs/project_outputs_v1.yaml"
 

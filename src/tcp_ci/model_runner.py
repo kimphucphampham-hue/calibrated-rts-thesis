@@ -8,6 +8,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
 
 
 FORBIDDEN_FEATURES = {
@@ -131,6 +132,65 @@ def build_logistic_estimator(
     )
 
 
+
+def build_random_forest_estimator(
+    model_config: dict,
+) -> RandomForestClassifier:
+    return RandomForestClassifier(
+        n_estimators=int(
+            model_config[
+                "n_estimators"
+            ]
+        ),
+        criterion=str(
+            model_config[
+                "criterion"
+            ]
+        ),
+        max_depth=(
+            None
+            if model_config[
+                "max_depth"
+            ] is None
+            else int(
+                model_config[
+                    "max_depth"
+                ]
+            )
+        ),
+        min_samples_split=int(
+            model_config[
+                "min_samples_split"
+            ]
+        ),
+        min_samples_leaf=int(
+            model_config[
+                "min_samples_leaf"
+            ]
+        ),
+        max_features=model_config[
+            "max_features"
+        ],
+        bootstrap=bool(
+            model_config[
+                "bootstrap"
+            ]
+        ),
+        class_weight=model_config[
+            "class_weight"
+        ],
+        random_state=int(
+            model_config[
+                "random_state"
+            ]
+        ),
+        n_jobs=int(
+            model_config[
+                "n_jobs"
+            ]
+        ),
+    )
+
 def build_probability_pipeline(
     feature_columns: list[str],
     preprocessing_config: dict,
@@ -179,6 +239,29 @@ def build_logistic_pipeline(
         estimator=estimator,
     )
 
+
+
+def build_random_forest_pipeline(
+    feature_columns: list[str],
+    config: dict,
+) -> Pipeline:
+    estimator = (
+        build_random_forest_estimator(
+            config[
+                "models"
+            ][
+                "random_forest"
+            ]
+        )
+    )
+
+    return build_probability_pipeline(
+        feature_columns=feature_columns,
+        preprocessing_config=config[
+            "preprocessing"
+        ],
+        estimator=estimator,
+    )
 
 def fit_probability_model(
     model,

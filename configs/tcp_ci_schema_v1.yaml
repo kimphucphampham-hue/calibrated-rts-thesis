@@ -344,6 +344,32 @@ candidate_features:
 
   change_context:
 
+    changed_entity_count:
+      data_type: "integer"
+      unit: "entity"
+      required: false
+      status: "CANDIDATE"
+
+      available_at: "pre_test_execution"
+      history_scope: "current build change context"
+      leakage_risk: "SAFE"
+
+      source_candidates:
+        - "builds.csv:commits"
+        - "entity_change_history.csv:Commit"
+        - "entity_change_history.csv:EntityId"
+
+      derivation: >
+        Count distinct EntityId values across all entity-change
+        records associated with all commits linked to the target
+        build.
+
+      temporal_rule: >
+        Every matched change record must satisfy
+        CommitDate <= build_started_at. If any matched record
+        violates this rule, or if a linked commit cannot be
+        matched, the feature is missing for the entire build.
+
     changed_loc:
       data_type: "integer"
       unit: "lines"
@@ -395,19 +421,39 @@ candidate_features:
 
   temporal:
 
-    recent_failure_density:
+    recent_failure_density_10:
       data_type: "float"
+      unit: "ratio"
       required: false
       status: "CANDIDATE"
 
       available_at: "pre_test_execution"
-      history_scope: "configured window of builds < b"
+      history_scope: >
+        previous 10 observed executions of the same test,
+        all with build_index strictly less than the target build
       leakage_risk: "SAFE"
 
-    execution_time_trend:
+      derivation: >
+        Arithmetic mean of failed over the previous 10 observed
+        executions of the same test. The current-build outcome
+        is excluded. The feature is missing until 10 prior
+        executions are available.
+
+    execution_time_trend_10:
       data_type: "float"
+      unit: "milliseconds_per_build_index"
       required: false
       status: "CANDIDATE"
+
       available_at: "pre_test_execution"
-      history_scope: "historical execution durations from builds < b"
+      history_scope: >
+        previous 10 observed executions of the same test,
+        all with build_index strictly less than the target build
       leakage_risk: "SAFE"
+
+      derivation: >
+        Ordinary least-squares slope of execution_time_ms
+        against build_index over the previous 10 observed
+        executions of the same test. The current-build duration
+        is excluded. The feature is missing until 10 prior
+        executions are available.

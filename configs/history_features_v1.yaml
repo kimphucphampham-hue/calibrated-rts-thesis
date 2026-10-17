@@ -7,6 +7,7 @@ dataset:
 inputs:
   canonical_root: "data/processed/tcp_ci/pilot"
   pilot_projects_config: "configs/pilot_projects_v1.yaml"
+  data_sources_config: "configs/data_sources_v1.yaml"
 
 outputs:
   feature_root: "data/processed/tcp_ci/pilot_history"
@@ -31,6 +32,9 @@ feature_columns:
   - test_age_builds
   - time_since_last_failure_builds
   - execution_time_mean_history_ms
+  - changed_entity_count
+  - recent_failure_density_10
+  - execution_time_trend_10
 
 definitions:
 

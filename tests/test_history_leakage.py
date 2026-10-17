@@ -17,9 +17,15 @@ KEY_COLUMNS = [
 ]
 
 
+HISTORY_DERIVED_FEATURE_COLUMNS = [
+    feature
+    for feature in FEATURE_COLUMNS
+    if feature != "changed_entity_count"
+]
+
 CHECK_COLUMNS = (
     SUPPORT_COLUMNS
-    + FEATURE_COLUMNS
+    + HISTORY_DERIVED_FEATURE_COLUMNS
 )
 
 
@@ -418,7 +424,7 @@ def test_feature_config_excludes_current_post_execution_fields():
     )
 
 
-def test_schema_marks_history_features_pre_execution_and_safe():
+def test_schema_marks_materialized_features_pre_execution_and_safe():
     schema_path = Path(
         "configs/tcp_ci_schema_v1.yaml"
     )
@@ -441,33 +447,71 @@ def test_schema_marks_history_features_pre_execution_and_safe():
             file
         )
 
-    schema_history = (
-        schema[
-            "candidate_features"
-        ][
-            "history"
+    schema_groups = schema[
+        "candidate_features"
+    ]
+
+    expected_groups = {
+        "history": [
+            "failure_rate_history",
+            "recent_failure",
+            "consecutive_failures",
+            "consecutive_passes",
+            "test_age_builds",
+            "time_since_last_failure_builds",
+            "execution_time_mean_history_ms",
+        ],
+        "change_context": [
+            "changed_entity_count",
+        ],
+        "temporal": [
+            "recent_failure_density_10",
+            "execution_time_trend_10",
+        ],
+    }
+
+    configured = set(
+        history_config[
+            "feature_columns"
         ]
     )
 
-    for feature in history_config[
-        "feature_columns"
-    ]:
-        assert feature in schema_history
+    expected_configured = {
+        feature
+        for features in expected_groups.values()
+        for feature in features
+    }
 
-        definition = (
-            schema_history[feature]
-        )
+    assert configured == expected_configured
 
-        assert (
-            definition[
-                "available_at"
+    for group_name, features in (
+        expected_groups.items()
+    ):
+        schema_group = (
+            schema_groups[
+                group_name
             ]
-            == "pre_test_execution"
         )
 
-        assert (
-            definition[
-                "leakage_risk"
-            ]
-            == "SAFE"
-        )
+        for feature in features:
+            assert feature in schema_group
+
+            definition = (
+                schema_group[
+                    feature
+                ]
+            )
+
+            assert (
+                definition[
+                    "available_at"
+                ]
+                == "pre_test_execution"
+            )
+
+            assert (
+                definition[
+                    "leakage_risk"
+                ]
+                == "SAFE"
+            )
