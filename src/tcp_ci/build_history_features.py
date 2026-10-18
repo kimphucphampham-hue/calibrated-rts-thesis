@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -1334,6 +1335,14 @@ def main() -> None:
         summaries.append(
             summary
         )
+
+        # Release the potentially large per-project feature
+        # dataframe before processing the next project.
+        #
+        # This is a resource-management step only. Generated
+        # feature values and experimental semantics are unchanged.
+        del featured
+        gc.collect()
 
     summary_df = pd.DataFrame(
         summaries
