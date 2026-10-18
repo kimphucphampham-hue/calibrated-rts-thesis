@@ -1,0 +1,81 @@
+version: 1
+
+execution_id: "PHASE11-CORE-RQ1-v1"
+
+role: >
+  Phase 11 ten-project RQ1 core-scale implementation
+  validation using the frozen RQ1 probability-estimation
+  and calibration methodology.
+
+primary_final_rq1_evidence: false
+
+references:
+  protocol: "docs/protocol_v1.md"
+  protocol_amendment:
+    "docs/protocol_amendment_001_core_project_eligibility.md"
+  rq1: "configs/rq1_v1.yaml"
+  projects: "configs/core_projects_v1.yaml"
+  core_features: "configs/core_features_v1.yaml"
+  models: "configs/rq1_models_v1.yaml"
+  calibration: "configs/calibration_v1.yaml"
+  outer_split: "configs/core_temporal_split_v1.yaml"
+
+inputs:
+  split_root: "data/processed/tcp_ci/core_split"
+  project_config: "configs/core_projects_v1.yaml"
+  train_filename: "train.csv"
+  test_filename: "test.csv"
+
+execution:
+  project_count: 10
+
+  project_order:
+    source: "configs/core_projects_v1.yaml"
+    field: "projects"
+    preserve_config_order: true
+
+  feature_set: "F1_F2_F3"
+
+  models:
+    - "logistic_regression"
+    - "random_forest"
+    - "xgboost"
+
+  calibration_variants:
+    - "uncalibrated"
+    - "platt"
+    - "isotonic"
+
+  expected_conditions_per_project: 9
+  maximum_conditions: 90
+
+  project_specific_models: true
+  project_specific_calibration: true
+  pooled_model_fit: false
+  pooled_calibration_fit: false
+
+  execution_mode: "sequential_by_project"
+
+outputs:
+  root: "results/core/rq1"
+  predictions_root: "results/core/rq1/predictions"
+  metrics: "results/core/rq1/rq1_metrics.csv"
+  calibration_bins: "results/core/rq1/calibration_bins.csv"
+  diagnostics: "results/core/rq1/model_diagnostics.csv"
+
+result_policy:
+  select_projects_from_model_metrics: false
+  select_best_project: false
+  select_best_model: false
+  select_best_calibration_method: false
+  change_primary_feature_set: false
+  pool_project_rows_as_primary_result: false
+  claim_final_walk_forward_rq1_evidence: false
+
+undefined_metric_policy:
+  value: "NA"
+
+phase_boundary:
+  walk_forward_evaluation: false
+  risk_bounded_selection: false
+  rq3_retraining: false
