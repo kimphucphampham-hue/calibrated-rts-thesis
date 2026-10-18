@@ -1,0 +1,231 @@
+version: 1
+
+screening_id: "CORE-PROJECT-SCREENING-v1"
+
+dataset:
+  name: "TCP-CI"
+  version: "v3"
+
+role: >
+  Operationalize project eligibility for Phase 11
+  multi-project core-scale pipeline expansion.
+
+primary_final_rq1_evidence: false
+
+references:
+  protocol: "docs/protocol_v1.md"
+  protocol_amendment:
+    "docs/protocol_amendment_001_core_project_eligibility.md"
+
+  pilot_projects:
+    "configs/pilot_projects_v1.yaml"
+
+  temporal_split:
+    "configs/temporal_split_v1.yaml"
+
+  rq1:
+    "configs/rq1_v1.yaml"
+
+  calibration:
+    "configs/calibration_v1.yaml"
+
+  core_features:
+    "configs/core_features_v1.yaml"
+
+
+project_scope:
+  discovered_projects_expected: 25
+
+  minimum_end_to_end_projects: 8
+  target_end_to_end_projects: 10
+
+  stretch_project_count_min: 15
+  stretch_project_count_max: 25
+
+
+selection_policy:
+  project_eligibility_frozen_before_model_performance: true
+
+  performance_based_inclusion_allowed: false
+  performance_based_exclusion_allowed: false
+
+  retain_frozen_pilot_anchors_if_eligible: true
+
+  additional_project_order:
+    field: "project_key"
+    order: "ascending"
+
+  stop_when_target_count_reached: true
+
+  rule: >
+    Retain the previously frozen five pilot projects only
+    when they satisfy the Phase 11 structural eligibility
+    rules. Add further eligible projects in ascending
+    project_key order until the target project count is
+    reached. The ordering is deterministic and does not use
+    model or calibration performance.
+
+
+required_source_artifacts:
+  - "exe.csv"
+  - "builds.csv"
+  - "id_map.csv"
+  - "entity_change_history.csv"
+
+diagnostic_source_artifacts:
+  - "dataset.csv"
+  - "contributors.csv"
+
+
+source_parsing:
+  all_required_artifacts_must_parse: true
+
+
+execution_identity:
+  staging_key_fields:
+    - "test"
+    - "build"
+    - "job"
+
+  require_zero_null_staging_key_rows: true
+
+  test_id_mapping:
+    execution_field: "test"
+    id_map_field: "value"
+    require_all_execution_tests_in_id_map: true
+
+
+execution_build_linkage:
+  require_all_execution_build_ids_in_build_metadata: true
+
+  require_zero_null_build_metadata_ids: true
+  require_unique_build_metadata_ids: true
+
+  require_all_build_timestamps_parseable: true
+
+
+canonical_key_precheck:
+  canonical_key:
+    - "project_id"
+    - "build_id"
+    - "test_id"
+
+  require_zero_null_key_rows: true
+
+  require_zero_duplicate_build_test_groups: true
+
+  require_zero_multi_job_build_test_groups: true
+
+  require_zero_conflicting_verdict_build_test_groups: true
+
+  rule: >
+    Phase 11 does not introduce a new aggregation rule for
+    repeated (build_id, test_id) executions. A project with
+    unresolved repeated test-build observations is not
+    eligible for the current core-scale execution set.
+
+
+target_validity:
+  source_field: "verdict"
+
+  allowed_values:
+    - 0
+    - 1
+    - 2
+    - 3
+
+  mapping:
+    pass:
+      - 0
+
+    fail:
+      - 1
+      - 2
+      - 3
+
+  require_non_missing: true
+
+  require_model_fit_both_classes: true
+
+
+execution_cost:
+  source_field: "duration"
+
+  require_non_missing: true
+  require_numeric: true
+  require_finite: true
+  require_non_negative: true
+
+
+chronological_history:
+  derive_boundaries_from_frozen_configs: true
+
+  outer_split_reference:
+    "configs/temporal_split_v1.yaml"
+
+  rq1_reference:
+    "configs/rq1_v1.yaml"
+
+  require_outer_train_minimum: true
+  require_outer_evaluation_minimum: true
+
+  require_initial_inner_model_fit_minimum: true
+
+  rule: >
+    Phase 11 continues to use the already frozen
+    chronological-holdout implementation-validation design.
+    A project must contain enough chronological builds for
+    the outer development/evaluation split and the initial
+    inner model-fit partition while respecting the frozen
+    minimum model-fit requirement.
+
+
+calibration_support:
+  affects_project_eligibility: false
+
+  rule: >
+    Calibration label support is not used to include or
+    exclude a project. After a project is selected
+    structurally, the frozen calibration expansion and
+    insufficient-support policy is applied. Platt and
+    isotonic may therefore be skipped with the frozen
+    insufficient-support status when required.
+
+
+evaluation_class_support:
+  affects_project_eligibility: false
+
+  rule: >
+    A project is not excluded because its outer evaluation
+    partition contains only one observed target class.
+    Undefined discrimination metrics use the frozen RQ1
+    undefined-metric policy.
+
+
+forbidden_selection_fields:
+  - "roc_auc"
+  - "average_precision"
+  - "brier_score"
+  - "log_loss"
+  - "ece"
+  - "mean_predicted_probability"
+  - "calibration_bias"
+  - "absolute_calibration_bias"
+  - "failure_recall"
+  - "test_selection_ratio"
+  - "runtime_ratio"
+  - "missed_failure_rate"
+  - "retained_risk"
+  - "cost_saving"
+
+
+phase_boundary:
+  walk_forward_evaluation: false
+  risk_bounded_selection: false
+  rq3_retraining: false
+
+  rule: >
+    This screening applies only to Phase 11 core-scale
+    implementation validation. Final walk-forward project
+    eligibility is frozen separately before the primary
+    longitudinal experiment.
