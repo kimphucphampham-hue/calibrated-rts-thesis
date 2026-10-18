@@ -221,6 +221,15 @@ def test_calibration_support_does_not_select_projects():
         is False
     )
 
+    assert (
+        config[
+            "target_validity"
+        ][
+            "model_fit_class_support_scope"
+        ]
+        == "minimum_model_fit_prefix"
+    )
+
 
 def test_performance_fields_are_forbidden():
     config = load_config()

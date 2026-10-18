@@ -147,6 +147,15 @@ target_validity:
 
   require_model_fit_both_classes: true
 
+  model_fit_class_support_scope:
+    "minimum_model_fit_prefix"
+
+  rule: >
+    The first frozen minimum-model-fit number of chronological
+    builds must contain both target classes. This guarantees
+    that backward calibration-window expansion cannot leave
+    the base model with a single-class training partition.
+
 
 execution_cost:
   source_field: "duration"

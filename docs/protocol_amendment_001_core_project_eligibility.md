@@ -46,7 +46,9 @@ A project is structurally eligible only when:
 8. realized execution cost is available and usable;
 9. sufficient chronological history exists for the frozen
    Phase 11 outer and inner partitions;
-10. the model-fit partition contains both target classes.
+10. the frozen minimum model-fit prefix contains both target
+    classes, so backward calibration-window expansion cannot
+    leave the base model with a single-class fitting partition.
 
 The current Phase 11 implementation does not define a new
 aggregation rule for duplicate `(build_id, test_id)`
