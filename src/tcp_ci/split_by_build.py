@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -611,6 +612,14 @@ def main() -> None:
         summaries.append(
             summary
         )
+
+        # Release large per-project split dataframes before
+        # processing the next project. This changes resource
+        # lifetime only; split semantics remain unchanged.
+        del train
+        del test
+        del assignments
+        gc.collect()
 
     summary_df = pd.DataFrame(
         summaries
