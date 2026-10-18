@@ -1,0 +1,47 @@
+version: 1
+project_set_id: PHASE11-CORE-PROJECTS-v1
+role: Phase 11 multi-project implementation-validation execution set
+primary_final_rq1_evidence: false
+references:
+  protocol: docs/protocol_v1.md
+  protocol_amendment: docs/protocol_amendment_001_core_project_eligibility.md
+  screening_config: configs/core_project_screening_v1.yaml
+  pilot_projects: configs/pilot_projects_v1.yaml
+screening_provenance:
+  git_commit: f1a20a18abdfc5ce8f2e4fe2fd0abf76a1a28df5
+  screening_sha256: 6d2ffb5ec4d1da77c80e8745b235652f3d3714a3e5fe31330ac9e28bab3679bb
+  screening_manifest_sha256: 57d52f5360b3825a28d204f8a19607a22b9347ce240d21b78d9380cad81d1a83
+  screened_projects: 25
+  structurally_eligible_projects: 25
+selection_policy:
+  target_project_count: 10
+  pilot_anchors_retained: true
+  additional_project_order: project_key_ascending
+  stop_when_target_reached: true
+  model_performance_used: false
+  eligible_not_selected_are_ineligible: false
+projects:
+- project_key: datasets/camunda@camunda-bpm-platform
+  selection_role: pilot_anchor
+- project_key: datasets/apache@shardingsphere
+  selection_role: pilot_anchor
+- project_key: datasets/facebook@buck
+  selection_role: pilot_anchor
+- project_key: datasets/Angel-ML@angel
+  selection_role: pilot_anchor
+- project_key: datasets/zolyfarkas@spf4j
+  selection_role: pilot_anchor
+- project_key: datasets/CompEvol@beast2
+  selection_role: deterministic_additional
+- project_key: datasets/EMResearch@EvoMaster
+  selection_role: deterministic_additional
+- project_key: datasets/Graylog2@graylog2-server
+  selection_role: deterministic_additional
+- project_key: datasets/JMRI@JMRI
+  selection_role: deterministic_additional
+- project_key: datasets/SonarSource@sonarqube
+  selection_role: deterministic_additional
+phase_boundary:
+  walk_forward_evaluation: false
+  risk_bounded_selection: false
+  rq3_retraining: false
