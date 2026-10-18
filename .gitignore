@@ -108,3 +108,10 @@ results/pilot/*
 *.pickle
 *.joblib
 *.model
+
+# ============================================================
+# GENERATED CORE RESULTS
+# ============================================================
+
+results/core/*
+!results/core/.gitkeep
