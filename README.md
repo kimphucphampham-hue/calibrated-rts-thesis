@@ -129,7 +129,9 @@ Historical execution-time estimates are used instead.
 | Per-project pilot outputs | Completed |
 | Experimental Protocol v1 | Completed |
 | Pilot Report v1 | Completed |
-| Probability calibration | Planned |
+| Probability calibration (Platt, isotonic) | Completed (implementation validation) |
+| Ten-project core-scale RQ1 pipeline (Phase 11) | Completed (implementation validation, not final evidence) |
+| Final walk-forward RQ1 protocol freeze | Planned |
 | Risk-bounded selector | Planned |
 | Core walk-forward experiment | Planned |
 | Retraining experiments | Planned |
@@ -140,6 +142,12 @@ feasibility.
 
 It is not treated as the final experimental evidence for
 RQ1-RQ3.
+
+Phase 11 extends the pipeline to ten frozen projects with
+Platt and isotonic calibration. Its results are
+implementation validation; final RQ1 evidence requires the
+walk-forward experiment. See
+[`docs/phase11_core_scale_milestone_v1.md`](docs/phase11_core_scale_milestone_v1.md).
 
 ---
 
@@ -736,6 +744,26 @@ The main project documents are:
 Defines the frozen methodological rules for the pilot and
 planned core experiments.
 
+### Protocol amendments
+
+[Protocol Amendment Register](docs/protocol_amendments.md)
+
+Assigns unique IDs to the protocol amendments (AMD-001 RQ1
+calibration design, AMD-002 Phase 11 core project
+eligibility) and records their status against Protocol v1.
+
+### Phase 11 core-scale milestone
+
+[Phase 11 Core-Scale Milestone v1](docs/phase11_core_scale_milestone_v1.md)
+
+Records the ten-project RQ1 implementation-validation run,
+its audits, reproducibility rerun, commit provenance and
+interpretation boundary.
+
+[Checksum manifest](docs/phase11_core_scale_checksums.sha256)
+and its [provenance note](docs/phase11_core_scale_checksums.md)
+freeze the Phase 11 configs, source and generated results.
+
 ### Pilot report
 
 [Pilot Report v1](docs/pilot_report_v1.md)
@@ -795,14 +823,18 @@ Defines the compact project-level output package.
 
 ## 22. Known limitations
 
-The current repository has completed the five-project pilot,
+The current repository has completed the five-project pilot
+and the Phase 11 ten-project RQ1 implementation validation,
 but several components required for the final thesis
 experiments remain pending.
 
 In particular:
 
-- Platt/sigmoid calibration is not yet implemented;
-- isotonic calibration is not yet implemented;
+- Platt/sigmoid and isotonic calibration have been validated
+  only on the chronological holdout, not in the final
+  walk-forward design;
+- reliability diagrams for the Phase 11 core results have not
+  yet been rendered;
 - the risk-bounded selector is not yet implemented;
 - the exact optimization method is not yet frozen in code;
 - the final walk-forward experiment has not yet been executed;
@@ -812,8 +844,8 @@ In particular:
 - the exact semantic granularity of the encoded TCP-CI test
   entity beyond the verified `id_map.csv:value` relationship
   remains limited;
-- computational runtime and memory requirements have not yet
-  been systematically benchmarked over the complete
+- computational runtime and memory have been benchmarked for
+  the ten-project RQ1 run, but not over the complete
   25-project dataset.
 
 These limitations are explicitly separated from resolved
@@ -823,15 +855,19 @@ pilot findings.
 
 ## 23. Roadmap
 
-The next core research stages are:
+The core research stages are:
 
 1. Screen additional TCP-CI projects using the frozen
-   eligibility criteria.
+   eligibility criteria. *(Completed in Phase 11.)*
 2. Expand the full pipeline toward at least 8 eligible
-   projects, targeting 10.
+   projects, targeting 10. *(Completed in Phase 11: 10
+   projects.)*
 3. Implement time-aware probability calibration.
+   *(Completed in Phase 11 as implementation validation.)*
 4. Evaluate uncalibrated, Platt/sigmoid, and isotonic
-   probabilities.
+   probabilities. *(Completed on the chronological holdout as
+   implementation validation; final evaluation requires the
+   walk-forward experiment.)*
 5. Implement and validate risk-bounded selection.
 6. Freeze the exact selection optimization procedure.
 7. Implement the core walk-forward experiment.

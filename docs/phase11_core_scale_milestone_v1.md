@@ -596,3 +596,164 @@ The next primary experimental objective is to implement and
 freeze the final longitudinal walk-forward evaluation design
 before making final RQ1 claims or proceeding to downstream
 risk-bounded RQ2 evidence.
+
+---
+
+## 16. Traceability addendum (Phase 12.F1 documentation reconciliation)
+
+This section was appended on 2026-10-19 during Phase 12.F1.
+Sections 1–15 are unchanged.
+
+It reconciles this document with a later, uncommitted draft
+milestone (`phase11_core_scale_milestone.md`), the Phase 12
+freeze audit (`phase12_freeze_audit.md`) and the Phase 11.9D
+Git audit (`phase11_9d_git_sync_audit.md`).
+
+These review records are not part of the repository. They are
+kept unmodified in a separate `thesis-review-logs/` folder
+outside the Git working tree, together with the Phase 12.F1
+reconciliation and pre-commit review reports. They are working
+records, not thesis evidence; every statement this addendum
+relies on is restated here.
+
+### 16.1 Authoritative document
+
+This document, `docs/phase11_core_scale_milestone_v1.md`, is
+the authoritative Phase 11 milestone record.
+
+The draft `phase11_core_scale_milestone.md` is superseded. Its
+unique, verified content is transferred into §16.3–§16.5
+below. The draft was never committed. It is retained
+unmodified outside the repository in `thesis-review-logs/`
+and is not a second authoritative record.
+
+### 16.2 Commit provenance
+
+| Role | Commit | Evidence |
+| --- | --- | --- |
+| Execution / implementation baseline | `4b9d6da61fe3a05de67db018e972f5acaa20bc06` (2026-10-18 17:04 +0700) | Last commit changing code or configs before the run. All 13 tracked files in the checksum manifest hash-match their blobs at this commit. Production result files (30 prediction CSVs and 3 summary CSVs) have modification times 2026-10-18 20:13–20:19, after this commit. |
+| Milestone documentation commit | `98eba9eec483709f354066e16ca3e98b8e5bc2d3` (2026-10-18 20:57 +0700) | `git diff --stat 4b9d6da 98eba9e` adds only this document. Code and configs are byte-identical to `4b9d6da`. |
+| Execution-config freeze | `4f044b7465a9396ba694daccb30dcf07981daefb` | Adds `configs/core_rq1_v1.yaml` and `tests/test_core_rq1_config.py`. |
+
+The draft's label "pre-milestone implementation commit:
+`98eba9e`" is superseded. `98eba9e` is a documentation-only
+commit; the execution baseline remains `4b9d6da`, as stated
+in §1.
+
+### 16.3 Evidence-status flag
+
+`primary_final_rq1_evidence = false`
+
+Source: `configs/core_rq1_v1.yaml`, line 10.
+
+Phase 11 results are implementation validation. They are not
+final RQ1 evidence, not walk-forward evidence, and not a basis
+for selecting a best model or calibration method (§14).
+
+### 16.4 Sub-phase map
+
+| Sub-phase | Content | Section |
+| --- | --- | --- |
+| 11.7A | Prediction/test integrity | §9.1 |
+| 11.7B | Independent metric recomputation | §9.2 |
+| 11.7C | Calibration-bin consistency | §9.3 |
+| 11.7D | Diagnostics/calibration-split audit | §9.4 |
+| 11.8A | Regression/reproducibility preflight | §11 |
+| 11.8B | Independent full reproducibility rerun | §12 |
+
+### 16.5 Additional statements transferred from the draft
+
+Re-checked during Phase 12.F1 from the frozen
+`results/core/rq1/*.csv` (gitignored, checksum-verified):
+
+- `rq1_metrics.csv`: 90 rows, 10 projects, all `AVAILABLE`;
+- `model_diagnostics.csv`: 30 rows, all `SUFFICIENT`;
+- `calibration_bins.csv`: 390 rows;
+- prediction files under `results/core/rq1/predictions/`: 30;
+- ROC-AUC and Average Precision are NA for exactly 9
+  conditions each, all `datasets/Graylog2@graylog2-server`;
+- Graylog `observed_failure_rate` is 0 in all 21 stored bins;
+- model-fit, calibration and evaluation build ranges do not
+  overlap for any of the 30 diagnostic rows;
+- model-fit starts at the first build and the three windows
+  are contiguous, so the development period is fully covered;
+- window sizes are identical across the three models of each
+  project;
+- backward expansion: Angel-ML 7 builds, Graylog 1,592 builds;
+  the smallest retained model-fit window is 189 builds.
+
+Carried over from the draft without re-verification in F1:
+
+- the 11.8A full-suite run reported 14 dependency deprecation
+  warnings alongside 223 passed tests.
+
+### 16.6 Checksum manifest
+
+The full SHA-256 manifest for this milestone is:
+
+`docs/phase11_core_scale_checksums.sha256`
+
+It has 46 entries: 7 configs, 6 source files, 3 summary CSVs
+and 30 prediction files. Verify from the repository root with:
+
+`shasum -a 256 -c docs/phase11_core_scale_checksums.sha256`
+
+Provenance, coverage and exclusions are documented in
+`docs/phase11_core_scale_checksums.md`.
+
+The §13 fingerprints are a subset of this manifest and agree
+with it.
+
+### 16.7 Protocol amendments
+
+Phase 11 executed under two protocol amendments whose files
+both carry the title "Amendment 001". Unique register IDs are
+assigned in `docs/protocol_amendments.md`:
+
+- AMD-001: `docs/protocol_amendment_001_rq1_calibration.md`;
+- AMD-002: `docs/protocol_amendment_001_core_project_eligibility.md`.
+
+Both amendment files are unchanged by Phase 12.F1. AMD-002 was
+created in `e6d00ff` and its eligibility rule 10 revised in
+`f1a20a1`, before the project-set freeze `096d74c`; the
+register records this revision history.
+
+### 16.8 Documentation gaps carried forward
+
+- Reliability diagrams for the CORE results have not been
+  rendered, although `configs/calibration_v1.yaml` and AMD-001
+  §10 require them. They can be drawn from the saved
+  `results/core/rq1/calibration_bins.csv` without rerunning
+  models. Deferred beyond Phase 12.F1.
+- The 11.7 audit scripts and the 11.8B rerun outputs are not
+  committed. Their evidence is the narrative in §9 and §12.
+- The manifest does not cover the data-stage configs, the
+  protocol or the amendments (see
+  `docs/phase11_core_scale_checksums.md`).
+
+### 16.9 Next stage
+
+Consistent with §15 and `docs/protocol_v1.md` §10.2, the next
+methodological stage is to specify, review and freeze the
+final chronology-preserving walk-forward RQ1 protocol before
+any walk-forward performance is inspected.
+
+Its evaluation windows, retraining policy, calibration policy,
+aggregation rules and project-eligibility rules must be frozen
+first. Final RQ1 claims and risk-bounded RQ2 and retraining
+RQ3 evidence follow it.
+
+This ordering constrains evidence, not implementation.
+Implementing and validating the risk-bounded selector (README
+§23, items 5–6) need not wait for the walk-forward freeze.
+Selector results obtained before that freeze are
+implementation validation only, not final RQ2 evidence. This
+addendum does not decide the order of the selector work and
+the walk-forward freeze.
+
+This addendum does not assign a phase number to that stage.
+"Phase 12" in the RQ1 milestone schedule (01–20 September
+2026) denotes "Document + freeze"; numbering the walk-forward
+freeze as "Phase 12.0", as the draft did, would collide with
+it. The phase number and date are left to the advisor-approved
+schedule.
