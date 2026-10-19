@@ -757,3 +757,135 @@ This addendum does not assign a phase number to that stage.
 freeze as "Phase 12.0", as the draft did, would collide with
 it. The phase number and date are left to the advisor-approved
 schedule.
+
+---
+
+## 17. Post-F1 Reliability Evidence Reconciliation
+
+This section was appended after Phase 12.F1 on 2026-10-19.
+
+Sections 1–16 remain unchanged. In particular, §16.8 records
+the documentation gaps that existed at the time of Phase 12.F1.
+This section updates their subsequent status without rewriting
+that historical record.
+
+### 17.1 Reliability diagrams completed
+
+The missing CORE RQ1 reliability diagrams identified in §16.8
+were generated from the previously frozen:
+
+`results/core/rq1/calibration_bins.csv`
+
+using:
+
+- `configs/calibration_v1.yaml`;
+- `src/tcp_ci/rq1_plots.py`;
+- `generate_reliability_figures()`.
+
+The execution produced:
+
+- 30 PNG diagrams;
+- 10 projects;
+- 3 models per project;
+- 3 calibration variants per diagram;
+- 1 figure index CSV.
+
+No model retraining or modification of frozen prediction
+artifacts was required.
+
+### 17.2 Validation and integrity
+
+The following checks passed:
+
+- 18 RQ1 plotting unit tests;
+- 8/8 structural figure validation checks;
+- 30/30 PNG files generated;
+- 31/31 figure and index SHA-256 checks;
+- 46/46 original Phase 11 SHA-256 checks;
+- visual review of 3 representative diagrams.
+
+The complete set of 30 diagrams has not undergone independent
+manual visual review.
+
+The figure integrity manifest is:
+
+`docs/phase11_core_reliability_figures.sha256`
+
+Detailed provenance and interpretation limitations are recorded in:
+
+`docs/phase11_core_reliability_provenance.md`
+
+These two evidence documents were committed in:
+
+`ac38440` — Document Phase 11 CORE reliability diagram evidence.
+
+### 17.3 Evidence archive
+
+The generated figures, figure index, source calibration-bin CSV
+and figure checksum manifest were packaged into:
+
+`phase11_reliability_evidence_2026-10-19.tar.gz`
+
+SHA-256:
+
+`b298958932aa958222da358294e0328a958a8efb913842ea023dc4b4e99a1d77`
+
+The archived figure/index files passed 31/31 SHA-256 checks.
+The archived calibration-bin CSV matched the local frozen source.
+
+The archive is stored outside Git in the local
+`../thesis-evidence-archive/` directory.
+
+The repository stores the provenance document and checksums,
+not the archived PNG data. Separate durable backup and archive
+availability remain operational preservation requirements.
+
+### 17.4 Independent audit and reproducibility records
+
+The Phase 11.7A–D audit results and Phase 11.8B exact rerun
+are documented in §9 and §12, respectively.
+
+The separately preserved Phase 11 evidence ZIP also contains
+the corresponding audit logs, rerun comparison report,
+configuration and rerun outputs.
+
+These records support the previously documented PASS results.
+They do not establish that the original independent audit
+scripts have been committed to Git or that the reproduction
+procedure is portable to a new machine without adaptation.
+
+The absence of committed audit scripts must not be confused
+with an absence of prior audit execution.
+
+### 17.5 Remaining documentation boundaries
+
+The reliability-diagram generation gap in §16.8 is resolved.
+
+The following limitations remain explicitly acknowledged:
+
+- independent audit scripts are not preserved as tracked
+  repository artifacts;
+- the full rerun outputs are stored outside Git;
+- local absolute paths in rerun configuration may require
+  adaptation on another machine;
+- the original 46-entry checksum manifest does not cover
+  all data-stage configurations, protocols or amendments;
+- a separate durable backup of the evidence archives
+  has not yet been confirmed.
+
+This reconciliation does not revise the frozen methodology,
+project selection, models, calibration policy or results.
+
+### 17.6 Scientific scope
+
+The reliability diagrams and associated Phase 11 audit evidence
+belong exclusively to CORE implementation validation on a
+chronological holdout.
+
+They are not final longitudinal walk-forward RQ1 evidence and
+cannot establish a best model, best calibration method or final
+research effectiveness claims.
+
+Closure of the original Phase 12 Document + Freeze milestone
+requires a separate review of its complete exit criteria.
+This section does not independently declare that milestone closed.
