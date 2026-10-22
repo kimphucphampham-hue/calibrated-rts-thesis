@@ -268,3 +268,82 @@ a proposed policy, not an approved M2 method.
 The Facebook/Buck zero-cost sensitivity and the
 walk-forward history-update policy remain open
 before formal method freeze.
+
+
+## 11. Baseline Comparison Design
+
+Status: DRAFT — PENDING M2 REVIEW
+
+### 11.1 Shared decision-time rules
+
+- Each selection call operates on one target build.
+- Only candidate IDs, decision-time probabilities,
+  historical features, and estimated costs are allowed.
+- Current-build failures and realized execution times
+  must not influence selection.
+- Baselines do not inherit the predicted-risk constraint
+  unless they explicitly use the risk-bounded selector.
+- Actual failures and durations are used only afterward
+  to evaluate selection effectiveness.
+
+### 11.2 Retest All
+
+Select all candidate tests. This is the full-execution
+reference for test-count and runtime metrics.
+
+### 11.3 Random Matched Count
+
+For each target build, select exactly the number of tests
+selected by the reference risk-bounded method.
+
+Sample uniformly without replacement using a
+reproducible, explicitly supplied random seed.
+
+Candidate IDs are sorted before random sampling so the
+result is independent of input-row order.
+
+The final evaluation runner must derive seeds from stable
+project/build/condition identifiers, not Python hash().
+
+Random sampling must not access target-build outcomes.
+
+### 11.4 Matching policy under review
+
+Proposed primary comparison: matched selected-test count.
+
+Proposed sensitivity comparison: matched estimated-cost
+budget using positive decision-time cost estimates.
+
+The treatment of budget overshoot, random repetitions,
+and their aggregation must be frozen before final runs.
+
+Budget-capped Random Selection uses randomized greedy packing
+over a canonical candidate order with an explicit random seed.
+
+The estimated selection cost must not exceed the reference
+budget. The method may leave part of the budget unused.
+
+This procedure does not uniformly sample all feasible subsets
+and is not an exact budget-matching algorithm.
+
+Its use as a sensitivity baseline, the number of random
+repetitions, and the aggregation procedure remain subject
+to M2 Method Freeze review.
+
+### 11.5 Other planned baselines
+
+- Failure-History: historical failure-rate ordering.
+- History/Duration: historical risk-to-cost ordering.
+- Static ML: a model snapshot fixed before evaluation.
+- Uncalibrated Risk: identical selector and rho with
+  uncalibrated predicted probabilities.
+
+Cold-start historical ranking behavior, selection cutoffs,
+static-model choice, and probability pairing remain
+open decisions.
+
+### 11.6 Scientific status
+
+This section records proposed implementation conventions.
+It does not amend Protocol v1, constitute M2 freeze,
+or establish final RQ2 experimental findings.
