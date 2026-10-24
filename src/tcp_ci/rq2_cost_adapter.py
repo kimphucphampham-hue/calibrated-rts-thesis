@@ -37,6 +37,7 @@ def _require_columns(
 ) -> None:
     missing = required - set(dataframe.columns)
 
+
     if missing:
         raise ValueError(
             f"{name}: missing columns: "
@@ -44,18 +45,26 @@ def _require_columns(
         )
 
 
+
 def estimate_build_costs(
     target: pd.DataFrame,
     history: pd.DataFrame,
+    zero_cost_floor_ms=None,
 ) -> pd.DataFrame:
     """Prepare positive estimated costs for one target build.
 
     Preserves valid positive historical per-test estimates.
-    Replaces missing/zero estimates using the median of
-    positive realized durations from strictly earlier
-    builds of the same project.
 
-    The fallback is provisional pending M2 review.
+    Default prototype policy:
+    - Missing and zero estimates use the median of positive
+      realized durations from strictly earlier same-project builds.
+
+    Candidate floor policy (zero_cost_floor_ms is not None):
+    - Missing estimates use the earlier-build positive median.
+    - Zero estimates use the configured positive floor.
+
+    No target-build realized duration is used for selection.
+    Both policies remain provisional pending M2 review.
     """
     _require_columns(
         target, TARGET_COLUMNS, "target"
@@ -63,6 +72,20 @@ def estimate_build_costs(
     _require_columns(
         history, HISTORY_COLUMNS, "history"
     )
+
+    if zero_cost_floor_ms is not None:
+        if (
+            isinstance(zero_cost_floor_ms, (bool, np.bool_))
+            or not isinstance(
+                zero_cost_floor_ms,
+                (int, float, np.integer, np.floating),
+            )
+            or not np.isfinite(zero_cost_floor_ms)
+            or zero_cost_floor_ms <= 0
+        ):
+            raise ValueError(
+                "zero_cost_floor_ms must be finite and positive."
+            )
 
     if target.empty:
         raise ValueError("Target build must not be empty.")
@@ -114,12 +137,29 @@ def estimate_build_costs(
             "Negative historical estimated cost."
         )
 
-    needs_fallback = estimated.isna() | estimated.eq(0)
+    missing = estimated.isna()
+    zero = estimated.eq(0)
+
+    if zero_cost_floor_ms is None:
+        # Existing prototype policy:
+        # both missing and zero use historical median.
+        needs_fallback = missing | zero
+    else:
+        # Candidate floor policy:
+        # missing uses median, zero uses configured floor.
+        needs_fallback = missing
 
     result = target.copy()
 
     if not needs_fallback.any():
         result["estimated_cost_ms"] = estimated
+
+        if zero_cost_floor_ms is not None:
+            result["estimated_cost_ms"] = (
+                result["estimated_cost_ms"]
+                .mask(zero, float(zero_cost_floor_ms))
+            )
+
         return result
 
     history_indices = pd.to_numeric(
@@ -176,6 +216,12 @@ def estimate_build_costs(
         needs_fallback,
         fallback,
     )
+
+    if zero_cost_floor_ms is not None:
+        result["estimated_cost_ms"] = (
+            result["estimated_cost_ms"]
+            .mask(zero, float(zero_cost_floor_ms))
+        )
 
     if (
         not np.isfinite(
