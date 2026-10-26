@@ -149,10 +149,107 @@ Evaluate differences in selected test IDs, estimated costs, Failure Recall, Test
 
 - Cross-project duration audit: COMPLETE.
 - Primary cost policy: CANDIDATE.
-- Sensitivity protocol: PROPOSED.
+- Sensitivity protocol: PHASE 11 PROTOTYPE EXECUTED; final longitudinal protocol PENDING.
 - Implementation update: COMPLETED (candidate prototype; not M2-frozen).
-- Acceptance tests: Unit and regression tests PASS (329 tests); longitudinal sensitivity validation PENDING.
+- Acceptance tests: Unit and regression tests PASS (337 tests); final longitudinal sensitivity validation PENDING.
 - M2-01 freeze: NOT APPROVED.
+
+## M2-01 — WP5.5 Sensitivity Evidence
+
+**Status:** EMPIRICAL PROTOTYPE EVIDENCE — NOT FROZEN.
+
+### Experiment Scope
+
+- Evidence type: Phase 11 chronological holdout sensitivity pilot.
+- Projects: Facebook/Buck and Angel-ML.
+- Model: Logistic Regression.
+- Calibration: Platt.
+- Risk coverage levels: 0.90, 0.95, and 0.99.
+- Chronological sampling: 12 evenly spaced evaluation builds per project.
+- Total: 24 unique builds and 72 paired policy comparisons.
+- Policies: project-specific positive floor and earlier-build positive-duration median.
+- Missing historical cost treatment is shared between policies.
+- Evaluation history uses retrospective full-information observations.
+- Final RQ2/RQ3 longitudinal walk-forward evidence is not yet available.
+
+### Reproducibility and Code Validation
+
+- Cost adapter and candidate policy committed in db91195.
+- Sensitivity runners and integration tests committed in abff05d.
+- Full regression suite: 337 tests passed.
+- Four CSV artifacts reproduced with identical SHA-256 hashes
+  across the original artifacts and two repeated runs.
+- Recorded runtime accounting was reconciled on all three
+  changed-selection cases.
+- These checks validate the prototype, not methodological freeze.
+
+### Paired Sensitivity Findings
+
+- Completed paired comparisons: 72.
+- Comparisons with changed selected test IDs: 3.
+- Distinct affected builds: 2.
+- Comparisons with changed estimated selected costs: 35.
+- Skipped builds: 0.
+- Paired comparisons containing actual failures: 18; all were from Angel-ML.
+- No sampled Facebook/Buck build contained actual failures; therefore failure-detection effects of the zero-cost policy remain unestablished.
+- All three changed-selection comparisons occurred in Facebook/Buck.
+- Angel-ML had no historical-zero costs in the sampled builds,
+  and selection was identical under the two policies.
+
+Changed-selection cases:
+
+| Project | Build | Rho | Floor selected | Median selected | RTR delta (floor minus median) |
+|---|---:|---:|---:|---:|---:|
+| Facebook/Buck | 692 | 0.95 | 498 | 296 | -0.350105 |
+| Facebook/Buck | 692 | 0.99 | 695 | 680 | -0.058281 |
+| Facebook/Buck | 754 | 0.90 | 687 | 678 | -0.044543 |
+
+### Runtime Accounting and Interpretation
+
+In the three changed-selection comparisons:
+
+- All tests selected only by the positive-floor policy
+  had recorded realized duration of zero.
+- Tests selected only by the historical-median policy
+  had positive aggregate recorded duration.
+- The RTR differences were reconciled against per-test
+  realized execution durations.
+- All three affected build-policy comparisons had zero
+  actual failed tests.
+
+The results establish that zero-cost handling can alter
+estimated costs and selected test sets in this pilot.
+
+They do not establish improved failure detection or actual
+CI wall-clock savings. Recorded zero execution duration must
+not be interpreted as zero real-world scheduling, startup,
+or orchestration overhead.
+
+### Outstanding Methodological Requirements
+
+1. Prespecify and justify the primary zero-cost policy
+   independently of evaluation outcome comparisons.
+2. Verify availability of floor inputs at each decision time
+   under the final longitudinal evaluation design.
+3. Assess sensitivity across the ten CORE projects,
+   including projects with few or no historical zeros.
+4. Evaluate costs and failure-detection metrics across
+   appropriate longitudinal windows.
+5. Resolve zero-total-predicted-risk policy (M2-02).
+6. Resolve historical cold-start behavior (M2-06).
+7. Specify retrospective full-information evaluation
+   separately from partial-observation simulation (M2-08).
+8. Review protocol compatibility and final diagnostic
+   reporting before freeze sign-off.
+
+### Decision
+
+**Primary policy:** NOT SELECTED.
+
+**M2-01 Freeze Approval:** NOT GRANTED.
+
+**Evidence disposition:** Retain as reproducible
+implementation-validation and sensitivity evidence.
 
 ## Freeze Sign-off
 
