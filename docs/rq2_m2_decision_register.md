@@ -251,6 +251,144 @@ or orchestration overhead.
 **Evidence disposition:** Retain as reproducible
 implementation-validation and sensitivity evidence.
 
+## M2-01 — WP5.7 Methodological Review
+
+**Status:** REVIEW RECOMMENDATION — NOT APPROVED.
+
+### Cross-Project Causal Availability
+
+The WP5.7.3 audit examined all ten CORE project
+train/evaluation partitions.
+
+- All ten training partitions ended strictly before
+  their respective evaluation partitions.
+- All ten training partitions contained eligible
+  strictly positive execution durations.
+- Training-derived positive minimum and median
+  costs were available for all ten projects.
+- Evaluation historical-zero observations: 61,869.
+- Evaluation missing-cost observations: 778.
+- These totals reconcile with the earlier M2 audit.
+
+Historical-zero observations were distributed as follows:
+
+- Facebook/Buck: 61,838.
+- SonarQube: 30.
+- ShardingSphere: 1.
+- All other CORE projects: 0.
+
+Facebook/Buck therefore accounts for approximately
+99.95% of the historical-zero evaluation observations.
+
+The audit establishes temporal availability of
+training-derived floors for the Phase 11 holdout
+partitions. It does not establish measurement
+resolution or complete longitudinal observability.
+
+### Review Recommendation
+
+**Recommended primary candidate:**
+historical positive-duration median.
+
+**Recommended sensitivity comparator:**
+project-specific positive floor.
+
+**Decision status:** RECOMMENDED FOR REVIEW ONLY.
+
+This recommendation favors an explicitly defined
+earlier-build positive-duration median because its
+meaning does not depend on interpreting the minimum
+observed positive duration as a verified measurement
+resolution.
+
+The median remains an estimate rather than ground
+truth. It may overestimate the cost of very fast tests.
+
+The positive floor remains important for sensitivity
+analysis because WP5.5 demonstrated changes in
+estimated costs and selected test identities.
+
+Neither policy is selected because it produced
+better observed TSR, RTR, or Failure Recall in the
+Phase 11 pilot.
+
+### Proposed Primary Cost Rules
+
+Subject to M2 review:
+
+1. Preserve finite, strictly positive historical
+   per-test estimated costs.
+2. For missing historical costs, consider a
+   same-project median of eligible strictly
+   positive durations from earlier builds.
+3. For zero historical costs, consider the same
+   earlier-build positive-duration median.
+4. Never use current-build realized duration to
+   calculate selection-time costs.
+5. Explicitly report targets without eligible
+   positive history; the cold-start rule remains
+   unresolved under M2-06.
+6. Preserve project-level results and report the
+   positive-floor sensitivity comparison.
+
+These are proposed rules, not an approved method.
+
+### Timing and Interpretation
+
+This methodological recommendation was developed
+after inspection of Phase 11 holdout sensitivity
+results but before final longitudinal evaluation.
+
+It must not be described as prespecified before
+the Phase 11 pilot.
+
+The final primary policy, comparator, and decision
+criteria must be recorded before confirmatory
+longitudinal evaluation is executed.
+
+### Protocol and Observability Boundaries
+
+Protocol v1 requires selection-time costs to be
+derived using information available before
+execution of the target test.
+
+For the Phase 11 holdout, the project-specific
+training-derived floor is temporally available.
+
+Final longitudinal walk-forward evaluation must
+verify cost availability at each relevant cutoff.
+
+The retrospective full-information assumption
+does not establish partial-observation deployability.
+The latter remains a separate M2-08 issue.
+
+The existing RQ2 Method Contract is DRAFT and
+already describes the earlier-build median rule
+as a candidate. Any final choice must undergo
+formal Method Contract compatibility review.
+
+### Outstanding Decision Gates
+
+- Confirm the primary cost rule and tie it to
+  a specified information-availability model.
+- Resolve M2-06 for absent positive history.
+- Resolve M2-08 observability assumptions.
+- Verify final longitudinal causal boundaries.
+- Review zero-duration measurement limitations.
+- Review required protocol and contract changes.
+- Approve the primary and sensitivity policies
+  before final confirmatory RQ2 evaluation.
+
+### Review Disposition
+
+**Recommended primary candidate:** Historical Median.
+
+**Recommended comparator:** Positive Floor.
+
+**Primary policy:** NOT SELECTED.
+
+**M2-01 Freeze Approval:** NOT GRANTED.
+
 ## Freeze Sign-off
 
 **Decision review:** PENDING
