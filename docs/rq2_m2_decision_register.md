@@ -490,6 +490,119 @@ for the tested scope.
 
 **M2-01 Freeze Approval:** NOT GRANTED.
 
+## M2-06 — WP5.9 Cold-Start Evidence and Review
+
+**Status:** EVIDENCE RECORDED — POLICY PENDING.
+
+### Ten-Project Cold-Start Exposure Audit
+
+The WP5.9.1 audit examined the training partitions
+of all ten CORE projects.
+
+- First recorded training build index: 1
+  in every project.
+- First build containing a positive realized
+  execution duration: build 1 in every project.
+- Early training builds without eligible
+  strictly earlier positive history: 10.
+- Training observations requiring zero/missing
+  cost fallback in those builds: 6,518.
+- Projects with this exposure: 10.
+- Projects with positive training history
+  before Phase 11 evaluation: 10.
+
+Breakdown of exposed training observations:
+
+| Project | Exposed observations |
+|---|---:|
+| JMRI | 4,245 |
+| ShardingSphere | 762 |
+| Facebook/Buck | 579 |
+| Camunda | 362 |
+| SonarQube | 288 |
+| spf4j | 91 |
+| EvoMaster | 81 |
+| beast2 | 53 |
+| Graylog2 | 30 |
+| Angel-ML | 27 |
+| Total | 6,518 |
+
+These are historical training observations,
+not failed final RQ2 selection attempts.
+
+The first build cannot use its own realized
+durations to construct decision-time costs.
+
+Under retrospective full-information history,
+positive project-level durations are available
+after the completion of build 1.
+
+### Candidate Operational Policy
+
+**Recommendation for review:**
+Conservative Retest All when an evaluation build
+requires a historical positive-duration median
+but has no eligible earlier positive history.
+
+The current cost adapter should continue
+to fail explicitly when median estimation
+is impossible.
+
+If approved, the evaluation orchestration
+layer should intercept this specific condition
+and select all candidate tests.
+
+This is a proposed exception policy,
+not an approved M2-06 decision.
+
+### Proposed Diagnostic Requirements
+
+Every affected evaluation build should report:
+
+- Project and build identifiers.
+- Decision-time history availability.
+- Reason for unavailable cost fallback.
+- Selected fallback action.
+- Total candidate test count.
+- Failure-detection and runtime metrics,
+  where ground-truth observations permit.
+- Explicit fallback status in aggregate reporting.
+
+Evaluation builds must not be silently removed
+from denominators because of cold-start.
+
+Training or warm-up builds should be reported
+separately from confirmatory evaluation builds.
+
+### Interpretation and Dependencies
+
+Retest All avoids fabricating unavailable
+selection-time cost estimates.
+
+It does not demonstrate cost savings or
+optimized test selection.
+
+The proposal must be assessed for compatibility
+with Protocol v1 and the RQ2 Method Contract.
+
+M2-08 must separately define retrospective
+full-information and partial-observation
+history semantics.
+
+The zero-total-predicted-risk rule in M2-02
+is a distinct decision and must not be
+implicitly settled by this proposal.
+
+### Decision Status
+
+**M2-06 recommended fallback:** Conservative Retest All.
+
+**M2-06 approval:** PENDING.
+
+**M2-01 primary policy:** NOT SELECTED.
+
+**M2-06 decision status:** PENDING — NOT FROZEN.
+
 ## Freeze Sign-off
 
 **Decision review:** PENDING
