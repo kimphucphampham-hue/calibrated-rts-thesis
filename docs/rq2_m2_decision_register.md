@@ -389,6 +389,107 @@ formal Method Contract compatibility review.
 
 **M2-01 Freeze Approval:** NOT GRANTED.
 
+## M2-01 — WP5.8 Acceptance Gate Review
+
+**Status:** TECHNICAL VALIDATION COMPLETED;
+METHODOLOGICAL APPROVAL PENDING.
+
+### Technical Evidence
+
+The existing historical cost adapter was reviewed
+at source level and tested with synthetic,
+decision-time-controlled observations.
+
+Behavioral checks confirmed:
+
+- Finite positive historical per-test costs
+  are preserved without modification.
+- Missing historical costs use the median
+  of eligible positive earlier-build durations.
+- Under the default policy, historical
+  zero costs use that same median.
+- Under the candidate floor policy, historical
+  zeros use the configured positive floor,
+  while missing costs still use the median.
+- Current and future build durations
+  are excluded from historical fallback.
+- Other-project durations cannot influence
+  same-project fallback.
+- Test order and DataFrame index are preserved.
+- Invalid floor configurations are rejected.
+- Missing eligible positive history raises
+  an explicit error when median is required.
+
+The controlled behavioral audit passed.
+The previously executed regression suite
+contained 337 passing tests.
+
+### Acceptance Gate Assessment
+
+| Gate | Status | Evidence or limitation |
+|---|---|---|
+| Positive historical cost preservation | PASS | Source and behavioral checks |
+| Missing-cost median fallback | PASS | Source and behavioral checks |
+| Zero-cost median fallback | PASS | Source and behavioral checks |
+| Strictly earlier same-project history | PASS for tested paths | Adapter checks and temporal audits |
+| Ten-project Phase 11 training boundary | PASS | WP5.7.3 |
+| Positive-floor comparator implementation | PASS | WP5.5 and WP5.8.2 |
+| Pilot reproducibility | PASS | Four CSV hashes reproduced |
+| Exceptional-build diagnostics | PENDING | Reporting policy not yet approved |
+| No-positive-history treatment | PENDING | M2-06 interaction |
+| Partial-observation interpretation | PENDING | M2-08 |
+| Primary method approval | NOT GRANTED | Formal review outstanding |
+
+### Interpretation Boundaries
+
+The adapter's explicit error when no eligible
+positive history exists is validated behavior,
+not an approved final cold-start policy.
+
+The Phase 11 retrospective full-information
+history is distinct from history observable
+under deployed regression-test selection.
+
+The source-level adapter checks do not,
+by themselves, establish upstream historical
+feature correctness in every longitudinal cycle.
+
+The recommended Historical Median primary
+candidate was documented after inspection
+of Phase 11 sensitivity evidence and before
+final confirmatory longitudinal evaluation.
+
+No policy is selected based on favorable
+Phase 11 runtime or failure-recall outcomes.
+
+### Outstanding Approval Requirements
+
+1. Specify the scope and format of diagnostics
+   for builds where cost estimation fails.
+2. Review the no-positive-history condition
+   jointly with M2-06.
+3. Define the information-availability model
+   required by M2-08.
+4. Check compatibility of the final proposed
+   cost policy with Protocol v1 and the
+   RQ2 Method Contract.
+5. Record and approve the primary policy
+   and sensitivity comparator before
+   final confirmatory evaluation.
+
+### Acceptance Disposition
+
+**Technical adapter validation:** PASS
+for the tested scope.
+
+**Recommended primary candidate:** Historical Median.
+
+**Recommended sensitivity comparator:** Positive Floor.
+
+**Primary policy:** NOT SELECTED.
+
+**M2-01 Freeze Approval:** NOT GRANTED.
+
 ## Freeze Sign-off
 
 **Decision review:** PENDING
