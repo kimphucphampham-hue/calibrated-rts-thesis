@@ -6,6 +6,8 @@ Failure labels and realized durations may be used here only
 AFTER selection. They must never influence selection-time costs.
 """
 
+from decimal import Decimal, InvalidOperation
+
 import numpy as np
 import pandas as pd
 
@@ -20,12 +22,23 @@ FALLBACK_MODE = "fallback_retest_all"
 
 EVIDENCE_SCOPE = "m2_06_reporting_prototype"
 
-GROUP_KEYS = [
-    "project",
-    "model",
-    "probability",
-    "rho",
-]
+LEGACY_GROUP_KEYS = ["project", "model", "probability", "rho"]
+CONDITION_KEYS = ["cost_policy", "baseline", "observation_regime"]
+GROUP_KEYS = LEGACY_GROUP_KEYS + CONDITION_KEYS
+
+
+def _canonical_build_index(value):
+    """Use an exact positive integer for duplicate-build identity."""
+    if isinstance(value, (bool, np.bool_)):
+        raise ValueError("Invalid report build_index.")
+    try:
+        number = Decimal(str(value).strip())
+    except (ValueError, InvalidOperation) as exc:
+        raise ValueError("Invalid report build_index.") from exc
+    if (not number.is_finite() or number <= 0
+            or number != number.to_integral_value()):
+        raise ValueError("Invalid report build_index.")
+    return int(number)
 
 
 def _single_value(frame, column):
@@ -90,6 +103,9 @@ def evaluate_post_selection(
     rho: float,
     model: str = "unspecified",
     probability: str = "unspecified",
+    cost_policy=None,
+    baseline=None,
+    observation_regime=None,
 ) -> dict:
     """Evaluate selection using recorded full-build outcomes.
 
@@ -124,6 +140,20 @@ def evaluate_post_selection(
         or not probability.strip()
     ):
         raise ValueError("Invalid probability name.")
+
+    # Identifiers only: these labels do not establish any M2 policy.
+    condition = dict(cost_policy=cost_policy, baseline=baseline,
+                     observation_regime=observation_regime)
+    provided = [value is not None for value in condition.values()]
+    if any(provided) and not all(provided):
+        raise ValueError("Incomplete experimental condition metadata.")
+    if all(provided):
+        if any(not isinstance(v, str) or not v.strip()
+               for v in condition.values()):
+            raise ValueError("Invalid experimental condition metadata.")
+        condition = {k: v.strip() for k, v in condition.items()}
+    else:
+        condition = {}  # Preserve unlabeled WP5.11 reporting behavior.
 
     project = _single_value(target, "project_id")
     build_index = _single_value(target, "build_index")
@@ -333,20 +363,30 @@ def evaluate_post_selection(
         "selected_test_ids": "|".join(
             sorted(selected_ids)
         ),
+        **condition,
     }
 
 
-def summarize_selection_reports(reports) -> pd.DataFrame:
-    """Aggregate complete build reports by experimental condition.
+def summarize_selection_reports(
+    reports, *, require_condition_metadata=False
+) -> pd.DataFrame:
+    """Aggregate with strict separation of labeled conditions.
 
-    Micro metrics use summed numerators and denominators.
-    Fallback builds are never silently excluded.
+    Unlabeled reports are accepted only as legacy prototype inputs.
+    Comparative experiments must set require_condition_metadata=True.
+    Micro metrics use summed numerators/denominators; fallback is kept.
     """
 
     frame = pd.DataFrame(reports).copy()
+    labeled = any(key in frame.columns for key in CONDITION_KEYS)
+    if require_condition_metadata and not labeled:
+        raise ValueError("Experimental condition metadata required.")
+    if labeled and not set(CONDITION_KEYS).issubset(frame.columns):
+        raise ValueError("Incomplete experimental condition metadata.")
+    keys = GROUP_KEYS if labeled else LEGACY_GROUP_KEYS
 
     required = set(
-        GROUP_KEYS
+        keys
         + [
             "build_index",
             "selection_mode",
@@ -371,13 +411,24 @@ def summarize_selection_reports(reports) -> pd.DataFrame:
             + str(sorted(missing))
         )
 
-    identity = GROUP_KEYS + ["build_index"]
+    if labeled:
+        for field in CONDITION_KEYS:
+            valid = frame[field].map(
+                lambda v: isinstance(v, str) and bool(v.strip())
+            )
+            if not valid.all():
+                raise ValueError(
+                    "Incomplete or invalid experimental condition metadata."
+                )
+            frame[field] = frame[field].str.strip()
 
+    identity = keys + ["build_index"]
     if frame[identity].isna().any().any():
-        raise ValueError(
-            "Null report grouping/build key."
-        )
-
+        raise ValueError("Null report grouping/build key.")
+    frame["_canonical_build_index"] = frame["build_index"].map(
+        _canonical_build_index
+    )
+    identity = keys + ["_canonical_build_index"]
     if frame.duplicated(subset=identity).any():
         raise ValueError(
             "Duplicate evaluation build within condition."
@@ -452,7 +503,7 @@ def summarize_selection_reports(reports) -> pd.DataFrame:
     summaries = []
 
     for key, part in frame.groupby(
-        GROUP_KEYS, sort=True
+        keys, sort=True
     ):
         total_tests = int(part["n_tests"].sum())
 
@@ -487,7 +538,7 @@ def summarize_selection_reports(reports) -> pd.DataFrame:
         )
 
         summaries.append({
-            **dict(zip(GROUP_KEYS, key)),
+            **dict(zip(keys, key)),
             "evidence_scope": EVIDENCE_SCOPE,
             "n_evaluation_builds": len(part),
             "n_fallback_builds": n_fallback,
@@ -529,6 +580,6 @@ def summarize_selection_reports(reports) -> pd.DataFrame:
 
     return (
         pd.DataFrame(summaries)
-        .sort_values(GROUP_KEYS)
+        .sort_values(keys)
         .reset_index(drop=True)
     )
