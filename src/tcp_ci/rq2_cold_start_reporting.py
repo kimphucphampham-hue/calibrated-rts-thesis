@@ -25,6 +25,7 @@ EVIDENCE_SCOPE = "m2_06_reporting_prototype"
 LEGACY_GROUP_KEYS = ["project", "model", "probability", "rho"]
 CONDITION_KEYS = ["cost_policy", "baseline", "observation_regime"]
 GROUP_KEYS = LEGACY_GROUP_KEYS + CONDITION_KEYS
+SUPPORTED_OBSERVATION_REGIME = "retrospective_full_information"
 
 
 def _canonical_build_index(value):
@@ -152,6 +153,10 @@ def evaluate_post_selection(
                for v in condition.values()):
             raise ValueError("Invalid experimental condition metadata.")
         condition = {k: v.strip() for k, v in condition.items()}
+        if condition["observation_regime"] != SUPPORTED_OBSERVATION_REGIME:
+            raise ValueError(
+                "Unsupported observation regime for full-information reporting."
+            )
     else:
         condition = {}  # Preserve unlabeled WP5.11 reporting behavior.
 
@@ -421,6 +426,13 @@ def summarize_selection_reports(
                     "Incomplete or invalid experimental condition metadata."
                 )
             frame[field] = frame[field].str.strip()
+
+        if not frame["observation_regime"].eq(
+            SUPPORTED_OBSERVATION_REGIME
+        ).all():
+            raise ValueError(
+                "Unsupported observation regime for full-information reporting."
+            )
 
     identity = keys + ["build_index"]
     if frame[identity].isna().any().any():

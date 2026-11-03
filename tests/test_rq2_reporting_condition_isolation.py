@@ -31,11 +31,10 @@ def labeled(build=10, **overrides):
     ("cost_policy", "positive_floor", 11),
     ("cost_policy", "positive_floor", 10),
     ("baseline", "retest_all", 10),
-    ("observation_regime", "synthetic_partial_observation", 10),
 ])
 def test_distinct_experimental_conditions_are_isolated(field, alternative,
                                                        second_build):
-    # Synthetic regime labels test separation, not M2-08 semantics.
+    # Only full-information reports may be compared by policy/baseline.
     second = labeled(second_build)
     second[field] = alternative
     summary = summarize_selection_reports(
@@ -109,3 +108,58 @@ def test_evaluator_optional_metadata_does_not_change_metrics():
         evaluate_post_selection(
             target, selection, rho=0.8, cost_policy="historical_median"
         )
+
+@pytest.mark.parametrize("regime", [
+    "partial_observation",
+    "synthetic_partial_observation",
+    "unknown_regime",
+])
+def test_evaluator_rejects_unsupported_regime_even_with_complete_truth(regime):
+    target = pd.DataFrame({
+        "project_id": ["synthetic", "synthetic"],
+        "build_index": [10, 10],
+        "build_id": ["b10", "b10"],
+        "test_id": ["a", "b"],
+        "execution_time_mean_history_ms": [5.0, 100.0],
+        "failed": [1, 0],
+        "execution_time_ms": [5.0, 15.0],
+    })
+    history = pd.DataFrame({
+        "project_id": ["synthetic"],
+        "build_index": [9],
+        "execution_time_ms": [20.0],
+    })
+    selection = select_with_cold_start_fallback(
+        target=target, history=history, probabilities=[0.9, 0.1], rho=0.8,
+    )
+    with pytest.raises(ValueError, match="Unsupported observation regime"):
+        evaluate_post_selection(
+            target, selection, rho=0.8,
+            cost_policy="historical_median",
+            baseline="risk_density_sort",
+            observation_regime=regime,
+        )
+
+
+@pytest.mark.parametrize("regime", [
+    "partial_observation", "synthetic_partial_observation",
+])
+@pytest.mark.parametrize("strict", [False, True])
+def test_aggregator_rejects_unsupported_regime_even_with_direct_reports(
+    regime, strict,
+):
+    with pytest.raises(ValueError, match="Unsupported observation regime"):
+        summarize_selection_reports(
+            [labeled(10, observation_regime=regime)],
+            require_condition_metadata=strict,
+        )
+
+
+def test_aggregator_accepts_and_normalizes_full_information_regime():
+    summary = summarize_selection_reports(
+        [labeled(10, observation_regime=" retrospective_full_information ")],
+        require_condition_metadata=True,
+    )
+    assert summary.iloc[0]["observation_regime"] == (
+        "retrospective_full_information"
+    )
