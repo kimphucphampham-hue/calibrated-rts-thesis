@@ -20,6 +20,11 @@ from src.tcp_ci.rq1_rq2_single_build_bridge import (
     SingleBuildResult,
     evaluate_one_build_with_rq1,
 )
+from src.tcp_ci.build_history_features import compute_history_features
+from src.tcp_ci.rq2_causal_feature_materializer import (
+    TARGET_COLUMNS,
+    materialize_target_preexecution_features,
+)
 
 IDENTITY = ("project_id", "build_id", "build_index", "test_id")
 ORACLE_FIELDS = IDENTITY + ("failed", "execution_time_ms")
@@ -72,6 +77,7 @@ def run_synthetic_multibuild_rq1_rq2(
     model_config: dict,
     calibration_config: dict,
     core_features_config: dict,
+    preexecution_mode: str = "supplied_synthetic",
 ) -> MultiBuildPrototypeResult:
     """Run a bounded, in-memory synthetic chronological full-history prototype.
 
@@ -80,9 +86,26 @@ def run_synthetic_multibuild_rq1_rq2(
     this function). The target oracle's values enter development/history only
     *after* that build's selection/scoring, to exercise sequential feedback.
     Re-fitting per build here is an ENGINEERING TEST, not frozen RQ3 cadence.
+
+    Modes:
+      supplied_synthetic: legacy synthetic precomputed feature inputs.
+      causal_from_history: target contains ONLY canonical pre-execution context;
+      re-derive development/target F1/F2/F3 with the frozen historical
+      transform using the observed full-information prefix before EACH build.
+      M2-08 remains pending; this is not a real CI completion-time simulator.
     """
+    if preexecution_mode not in {"supplied_synthetic", "causal_from_history"}:
+        raise ValueError("Unsupported preexecution_mode.")
+    causal = preexecution_mode == "causal_from_history"
     dev_required = set(ORACLE_FIELDS)
-    pre_required = set(IDENTITY) | {"execution_time_mean_history_ms"}
+    pre_required = (set(TARGET_COLUMNS) if causal else
+                    set(IDENTITY) | {"execution_time_mean_history_ms"})
+    if causal:
+        required_raw = set(ORACLE_FIELDS) | {"build_started_at", "changed_entity_count"}
+        if not isinstance(initial_development, pd.DataFrame) or set(initial_development.columns) != required_raw:
+            raise ValueError("Causal development must contain exactly raw canonical and F2 fields.")
+        if not isinstance(target_preexecution, pd.DataFrame) or set(target_preexecution.columns) != set(TARGET_COLUMNS):
+            raise ValueError("Causal target must contain exactly pre-execution context fields.")
     oracle_required = set(ORACLE_FIELDS)
     seed_project, seed_indices = _check_frame(
         initial_development, "initial_development", dev_required
@@ -131,10 +154,21 @@ def run_synthetic_multibuild_rq1_rq2(
     development_counts = []
     history_counts = []
     for build_index in sorted(target_indices):
-        current_pre = target_preexecution.loc[
+        current_context = target_preexecution.loc[
             pd.to_numeric(target_preexecution["build_index"]) == build_index
         ].copy(deep=True)
-        current_pre = current_pre.sort_values("test_id", kind="mergesort").reset_index(drop=True)
+        current_context = current_context.sort_values(
+            "test_id", kind="mergesort").reset_index(drop=True)
+        if causal:
+            # Never trust precomputed historical features from the caller.
+            # Current target oracle is intentionally unavailable to both calls.
+            current_pre = materialize_target_preexecution_features(
+                observed_history=development, target_context=current_context,
+            )
+            development_features = compute_history_features(development.copy(deep=True))
+        else:
+            current_pre = current_context.copy(deep=True)
+            development_features = development.copy(deep=True)
         current_oracle = target_oracle.loc[
             pd.to_numeric(target_oracle["build_index"]) == build_index,
             list(ORACLE_FIELDS),
@@ -150,7 +184,7 @@ def run_synthetic_multibuild_rq1_rq2(
         # Existing RQ1 adapter masks target truth; existing RQ2 selector uses
         # only current pre-execution inputs plus the earlier history above.
         step = evaluate_one_build_with_rq1(
-            development=development.copy(deep=True),
+            development=development_features,
             target_preexecution=current_pre.copy(deep=True),
             history=history,
             target_oracle=current_oracle.copy(deep=True),
@@ -166,7 +200,9 @@ def run_synthetic_multibuild_rq1_rq2(
 
         # Feedback is appended ONLY AFTER selection & retrospective scoring.
         # Join by canonical identity, never align oracle outcomes by row order.
-        realized = current_pre.merge(
+        # Advance with RAW pre-execution metadata + oracle, not computed
+        # target features (which must be rematerialized from the next prefix).
+        realized = current_context.merge(
             current_oracle, on=list(IDENTITY), how="left", sort=False,
             validate="one_to_one", indicator=True,
         )
