@@ -20,6 +20,7 @@ from src.tcp_ci.rq1_rq2_single_build_bridge import (
     SingleBuildResult,
     evaluate_one_build_with_rq1,
 )
+from src.tcp_ci.rq1_fitted_snapshot_prototype import fit_rq1_snapshot
 from src.tcp_ci.build_history_features import compute_history_features
 from src.tcp_ci.rq2_causal_feature_materializer import (
     TARGET_COLUMNS,
@@ -78,6 +79,7 @@ def run_synthetic_multibuild_rq1_rq2(
     calibration_config: dict,
     core_features_config: dict,
     preexecution_mode: str = "supplied_synthetic",
+    snapshot_mode: str = "refit_per_build",  # opt-in synthetic only
 ) -> MultiBuildPrototypeResult:
     """Run a bounded, in-memory synthetic chronological full-history prototype.
 
@@ -85,7 +87,9 @@ def run_synthetic_multibuild_rq1_rq2(
     target features MUST have been produced causally upstream (not verified by
     this function). The target oracle's values enter development/history only
     *after* that build's selection/scoring, to exercise sequential feedback.
-    Re-fitting per build here is an ENGINEERING TEST, not frozen RQ3 cadence.
+    Default refit per build is an engineering test, not frozen RQ3 cadence.
+    Opt-in fixed_initial_synthetic reuses one model/calibrator snapshot;
+    neither mode constitutes an approved static/RQ3 retraining policy.
 
     Modes:
       supplied_synthetic: legacy synthetic precomputed feature inputs.
@@ -97,6 +101,8 @@ def run_synthetic_multibuild_rq1_rq2(
     if preexecution_mode not in {"supplied_synthetic", "causal_from_history"}:
         raise ValueError("Unsupported preexecution_mode.")
     causal = preexecution_mode == "causal_from_history"
+    if snapshot_mode not in {"refit_per_build", "fixed_initial_synthetic"}:
+        raise ValueError("Unsupported snapshot_mode (synthetic prototype only).")
     dev_required = set(ORACLE_FIELDS)
     pre_required = (set(TARGET_COLUMNS) if causal else
                     set(IDENTITY) | {"execution_time_mean_history_ms"})
@@ -149,6 +155,19 @@ def run_synthetic_multibuild_rq1_rq2(
     _binary_labels(target_oracle, "target_oracle")
 
     development = initial_development.copy(deep=True)
+    fixed_snapshot = None
+    if snapshot_mode == "fixed_initial_synthetic":
+        # Fit ONCE on initial development. Later full-history feedback may
+        # update F1/F2/F3 and estimated cost, but never this fitted object.
+        initial_features = (compute_history_features(development.copy(deep=True))
+                            if causal else development.copy(deep=True))
+        fixed_snapshot = fit_rq1_snapshot(
+            initial_features, model_name=model_name, rq1_config=rq1_config,
+            model_config=model_config, calibration_config=calibration_config,
+            core_features_config=core_features_config,
+        )
+        if fixed_snapshot is None:
+            raise ValueError("fixed_initial_synthetic requires a fitted RQ1 snapshot; refusing silent refit")
     # The sole source of cost history is a strictly earlier, local state.
     steps = []
     development_counts = []
@@ -195,6 +214,7 @@ def run_synthetic_multibuild_rq1_rq2(
             model_config=model_config,
             calibration_config=calibration_config,
             core_features_config=core_features_config,
+            **({"rq1_snapshot": fixed_snapshot} if fixed_snapshot is not None else {}),
         )
         steps.append(step)
 

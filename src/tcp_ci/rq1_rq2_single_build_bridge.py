@@ -16,6 +16,7 @@ import pandas as pd
 
 from src.tcp_ci.rq1_pipeline import PROBABILITY_COLUMNS
 from src.tcp_ci.rq1_preselection_adapter import predict_preselection_rq1
+from src.tcp_ci.rq1_fitted_snapshot_prototype import predict_from_rq1_snapshot
 from src.tcp_ci.rq2_cold_start_orchestrator import select_with_cold_start_fallback
 from src.tcp_ci.rq2_cold_start_reporting import evaluate_post_selection
 
@@ -93,6 +94,8 @@ def evaluate_one_build_with_rq1(
     model_config: dict,
     calibration_config: dict,
     core_features_config: dict,
+    *,
+    rq1_snapshot=None,  # opt-in synthetic fitted object; legacy default unchanged
 ) -> SingleBuildResult:
     """Bridge existing RQ1 adapter to real RQ2 selector/reporting for ONE build.
 
@@ -126,16 +129,39 @@ def evaluate_one_build_with_rq1(
     if not isinstance(model_name, str) or not model_name.strip():
         raise ValueError("Invalid model name.")
 
-    # This adapter validates strictly earlier development and masks target labels.
-    predictions, diagnostics = predict_preselection_rq1(
-        development=development,
-        target_preexecution=target_preexecution,
-        model_name=model_name,
-        rq1_config=rq1_config,
-        model_config=model_config,
-        calibration_config=calibration_config,
-        core_features_config=core_features_config,
-    )
+    # WP5.17.16: keep legacy refit path as default; snapshot path is opt-in.
+    if rq1_snapshot is None:
+        # This adapter validates strictly earlier development and masks target labels.
+        predictions, diagnostics = predict_preselection_rq1(
+            development=development,
+            target_preexecution=target_preexecution,
+            model_name=model_name,
+            rq1_config=rq1_config,
+            model_config=model_config,
+            calibration_config=calibration_config,
+            core_features_config=core_features_config,
+        )
+    else:
+        if (rq1_snapshot.model_name != model_name
+                or str(rq1_snapshot.project_id) != str(project)):
+            raise ValueError('Snapshot model/project identity mismatch.')
+        safe_columns = list(dict.fromkeys(list(IDENTITY) + list(rq1_snapshot.feature_columns)))
+        if POST_EXECUTION.intersection(safe_columns):
+            raise ValueError('Snapshot features include post-execution fields.')
+        missing = set(safe_columns).difference(target_preexecution.columns)
+        if missing:
+            raise ValueError(f'Snapshot target features missing: {sorted(missing)}')
+        # This whitelist excludes oracle fields AND unrelated columns.
+        predictions = predict_from_rq1_snapshot(
+            rq1_snapshot, target_preexecution.loc[:, safe_columns].copy(deep=True)
+        )
+        diagnostics = {
+            'prediction_mode': 'fixed_initial_snapshot_synthetic',
+            'snapshot_last_development_build_index': rq1_snapshot.last_development_build_index,
+            'model_fit_last_build_index': rq1_snapshot.model_fit_last_build_index,
+            'calibration_support_sufficient': rq1_snapshot.calibration_support_sufficient,
+        }
+
     col = PROBABILITY_COLUMNS[probability_variant]
     probability = pd.to_numeric(predictions[col], errors="raise").to_numpy(dtype=float)
     if not np.isfinite(probability).all() or ((probability < 0) | (probability > 1)).any():
