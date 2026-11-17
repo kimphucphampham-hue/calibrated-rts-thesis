@@ -344,3 +344,78 @@ def test_risk_density_does_not_recompute_every_prefix(monkeypatch):
     # Input validation and result validation may use fsum.
     # The greedy loop must not recompute every prefix.
     assert len(calls) <= 4
+
+
+def test_m2_03_milp_oracle_rejects_more_than_50_candidates_before_solving(monkeypatch):
+    def must_not_call_solver(**kwargs):
+        raise AssertionError("Oversize MILP case must not invoke the solver")
+
+    monkeypatch.setattr(selector_module, "milp", must_not_call_solver)
+    with pytest.raises(ValueError, match="at most 50"):
+        milp_select(
+            test_ids=[f"t{i}" for i in range(51)],
+            probabilities=[0.5] * 51,
+            costs_ms=[1.0] * 51,
+            rho=0.95,
+        )
+
+
+def test_m2_03_milp_oracle_uses_ten_second_zero_gap_solver_options(monkeypatch):
+    from types import SimpleNamespace
+    import numpy as np
+
+    observed = []
+
+    def fake_solver(**kwargs):
+        observed.append(kwargs)
+        return SimpleNamespace(
+            status=0,
+            x=np.array([1.0, 1.0]),
+            success=True,
+            message="synthetic result for option contract only",
+        )
+
+    monkeypatch.setattr(selector_module, "milp", fake_solver)
+    result = milp_select(["a", "b"], [0.6, 0.4], [1.0, 2.0], 0.95)
+    assert len(observed) == 1
+    assert observed[0]["options"] == {
+        "disp": False,
+        "time_limit": 10.0,
+        "mip_rel_gap": 0.0,
+    }
+    assert set(result.selected_test_ids) == {"a", "b"}
+    # Mocked solver success is NOT evidence of real-world solver optimality.
+
+
+def test_m2_03_milp_oracle_rejects_timeout_even_with_incumbent(monkeypatch):
+    from types import SimpleNamespace
+    import numpy as np
+
+    def fake_solver(**kwargs):
+        return SimpleNamespace(
+            status=1,
+            x=np.array([1.0, 1.0]),
+            success=False,
+            message="Time limit reached; candidate solution exists",
+        )
+
+    monkeypatch.setattr(selector_module, "milp", fake_solver)
+    with pytest.raises(RuntimeError, match="did not prove optimality.*status=1"):
+        milp_select(["a", "b"], [0.6, 0.4], [1.0, 2.0], 0.95)
+
+
+def test_m2_03_milp_oracle_checks_returned_risk_independently(monkeypatch):
+    from types import SimpleNamespace
+    import numpy as np
+
+    def fake_solver(**kwargs):
+        return SimpleNamespace(
+            status=0,
+            x=np.array([1.0, 0.0]),
+            success=True,
+            message="synthetic allegedly optimal but risk-infeasible",
+        )
+
+    monkeypatch.setattr(selector_module, "milp", fake_solver)
+    with pytest.raises(RuntimeError, match="violates risk-retention constraint"):
+        milp_select(["a", "b"], [0.1, 0.9], [1.0, 2.0], 0.90)

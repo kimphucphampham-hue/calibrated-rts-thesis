@@ -173,6 +173,9 @@ def milp_select(
     )
 
     n = len(ids)
+    # M2-03: MILP is a small-case diagnostic oracle, never the primary selector.
+    if n > 50:
+        raise ValueError("MILP oracle supports at most 50 candidate tests.")
 
     # Normalize predicted risk to improve numerical
     # conditioning when probabilities are very small.
@@ -194,7 +197,9 @@ def milp_select(
             lb=np.array([rho]),
             ub=np.array([np.inf]),
         ),
-        options={"disp": False},
+        # Stop expensive cases and require zero solver-reported relative MIP gap.
+        # A time-limited/nonoptimal result must never be labeled optimal.
+        options={"disp": False, "time_limit": 10.0, "mip_rel_gap": 0.0},
     )
 
     if (
