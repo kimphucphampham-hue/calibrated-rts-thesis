@@ -247,16 +247,23 @@ def test_probability_row_alignment_is_checked():
         )
 
 
-def test_zero_total_risk_remains_m2_02_decision():
-    with pytest.raises(
-        ValueError,
-        match="M2-02 is pending",
-    ):
-        run(
-            make_target([0.0, np.nan]),
-            make_history(),
-            probabilities=[0.0, 0.0],
-        )
+def test_zero_total_risk_conservative_retest_all():
+    result = run(
+        make_target([0.0, np.nan]),
+        make_history(),
+        probabilities=[0.0, 0.0],
+    )
+    assert result.selection_mode == "fallback_retest_all"
+    assert result.fallback_reason == "zero_total_predicted_risk"
+    assert result.selected_test_ids == ("test-a", "test-b")
+    assert result.n_candidates == 2
+    assert result.estimated_selected_cost_ms is None
+    assert np.isnan(result.retained_risk_ratio)  # 0/0 is undefined
+    diagnostic = result.diagnostic_record()
+    assert diagnostic["fallback_reason"] == "zero_total_predicted_risk"
+    assert diagnostic["n_candidates"] == 2
+    assert diagnostic["n_selected"] == 2
+    assert np.isnan(diagnostic["retained_risk_ratio"])
 
 
 @pytest.mark.parametrize("rho", [0.0, 1.1, np.nan])
@@ -284,3 +291,84 @@ def test_duplicate_test_ids_are_rejected():
             target,
             make_history(),
         )
+
+
+
+def test_zero_total_risk_does_not_require_history_cost_estimate(monkeypatch):
+    import src.tcp_ci.rq2_cold_start_orchestrator as orchestrator
+
+    def must_not_estimate_costs(**kwargs):
+        raise AssertionError("zero-risk decision must not access historical costs")
+
+    monkeypatch.setattr(orchestrator, "estimate_build_costs", must_not_estimate_costs)
+    result = run(
+        make_target([0.0, np.nan]),
+        make_history(positive=False),
+        probabilities=[0.0, 0.0],
+    )
+    assert result.fallback_reason == "zero_total_predicted_risk"
+    assert result.selected_test_ids == ("test-a", "test-b")
+
+
+
+def test_zero_total_risk_post_selection_reporting_uses_oracle_only_after_selection():
+    from src.tcp_ci.rq2_cold_start_reporting import evaluate_post_selection
+
+    target = make_target([0.0, np.nan]).copy()
+    target["failed"] = [0, 1]
+    target["execution_time_ms"] = [5.0, 7.0]
+    result = run(target, make_history(), probabilities=[0.0, 0.0])
+    report = evaluate_post_selection(target, result, rho=0.95)
+    assert report["fallback_reason"] == "zero_total_predicted_risk"
+    assert report["n_selected"] == 2
+    assert report["tsr"] == pytest.approx(1.0)
+    assert report["rtr"] == pytest.approx(1.0)
+    assert report["captured_failures"] == 1
+    assert report["missed_failures"] == 0
+
+
+@pytest.mark.parametrize("invalid_probabilities", [
+    [float("nan"), 0.0],
+    [float("inf"), 0.0],
+    [-0.01, 0.0],
+    [1.01, 0.0],
+])
+def test_zero_risk_fallback_does_not_mask_invalid_probabilities(invalid_probabilities):
+    with pytest.raises(ValueError):
+        run(
+            make_target([0.0, np.nan]),
+            make_history(positive=False),
+            probabilities=invalid_probabilities,
+        )
+
+
+def test_zero_total_risk_reporting_summary_accepts_undefined_retained_risk():
+    from src.tcp_ci.rq2_cold_start_reporting import (
+        evaluate_post_selection,
+        summarize_selection_reports,
+    )
+
+    target = make_target([0.0, np.nan]).copy()
+    target["failed"] = [0, 1]
+    target["execution_time_ms"] = [5.0, 7.0]
+    selection = run(target, make_history(), probabilities=[0.0, 0.0])
+    report = evaluate_post_selection(target, selection, rho=0.95)
+    assert np.isnan(report["retained_risk_ratio"])
+    assert report["estimated_cost_defined"] is False
+    assert report["fallback_reason"] == "zero_total_predicted_risk"
+    aggregated = summarize_selection_reports([report])
+    assert len(aggregated) == 1
+
+
+def test_zero_total_risk_reporting_rejects_finite_or_wrong_reason():
+    from dataclasses import replace
+    from src.tcp_ci.rq2_cold_start_reporting import evaluate_post_selection
+
+    target = make_target([0.0, np.nan]).copy()
+    target["failed"] = [0, 1]
+    target["execution_time_ms"] = [5.0, 7.0]
+    selection = run(target, make_history(), probabilities=[0.0, 0.0])
+    with pytest.raises(ValueError, match="Invalid fallback selection diagnostic"):
+        evaluate_post_selection(target, replace(selection, retained_risk_ratio=1.0), rho=0.95)
+    with pytest.raises(ValueError, match="Invalid retained risk ratio"):
+        evaluate_post_selection(target, replace(selection, fallback_reason="no_positive_prior_cost_history"), rho=0.95)

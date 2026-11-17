@@ -139,11 +139,20 @@ def select_with_cold_start_fallback(
 
     total_risk = float(np.sum(p))
 
-    # M2-02 is a separate pending decision.
-    # Do not silently treat zero predicted risk as cold start.
-    if total_risk <= 0:
-        raise ValueError(
-            "Zero total predicted risk: M2-02 is pending."
+    # M2-02 working policy: conservative Retest All for a VALID nonempty
+    # build where every predicted probability is exactly zero. This is
+    # independent of the M2-06 no-positive-earlier-cost-history fallback.
+    # Because total predicted risk is zero, the ratio 0/0 is undefined.
+    if total_risk == 0.0:
+        return ColdStartSelectionResult(
+            project_id=str(target["project_id"].iloc[0]),
+            build_index=str(target["build_index"].iloc[0]),
+            selected_test_ids=test_ids,
+            selection_mode="fallback_retest_all",
+            fallback_reason="zero_total_predicted_risk",
+            n_candidates=len(test_ids),
+            estimated_selected_cost_ms=None,
+            retained_risk_ratio=float("nan"),
         )
 
     try:

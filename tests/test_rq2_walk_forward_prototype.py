@@ -113,6 +113,14 @@ def test_invalid_callback_probabilities_are_rejected():
         run_retrospective_prototype(records(), lambda h, d: [-0.1, 0.2], 0.5)
 
 
-def test_m2_02_zero_risk_not_silently_treated_as_approved():
-    with pytest.raises(ValueError):
-        run_retrospective_prototype(records(), lambda h, d: [0.0, 0.0], 0.5)
+def test_m2_02_zero_risk_retests_all_in_walk_forward_prototype():
+    import math
+    steps = run_retrospective_prototype(records(), lambda h, d: [0.0, 0.0], 0.5)
+    assert steps, "Expected at least one evaluated synthetic build"
+    for step in steps:
+        report = step.report
+        assert report["fallback_reason"] == "zero_total_predicted_risk"
+        assert report["selection_mode"] == "fallback_retest_all"
+        assert report["n_selected"] == report["n_tests"]
+        assert report["tsr"] == pytest.approx(1.0)
+        assert math.isnan(report["retained_risk_ratio"])

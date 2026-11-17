@@ -235,7 +235,14 @@ def evaluate_post_selection(
     if is_fallback:
         if (
             selected_set != available_set
-            or selection.fallback_reason != COLD_START_REASON
+            or selection.fallback_reason not in (
+                COLD_START_REASON,
+                "zero_total_predicted_risk",
+            )
+            or (
+                selection.fallback_reason == "zero_total_predicted_risk"
+                and not np.isnan(selection.retained_risk_ratio)
+            )
             or estimated is not None
         ):
             raise ValueError(
@@ -267,7 +274,11 @@ def evaluate_post_selection(
 
     coverage = float(selection.retained_risk_ratio)
 
-    if (
+    if not (
+        is_fallback
+        and selection.fallback_reason == "zero_total_predicted_risk"
+        and np.isnan(coverage)
+    ) and (
         not np.isfinite(coverage)
         or coverage < 0
         or coverage > 1 + 1e-9
@@ -277,7 +288,7 @@ def evaluate_post_selection(
         )
 
     if is_fallback:
-        if not np.isclose(
+        if selection.fallback_reason == COLD_START_REASON and not np.isclose(
             coverage, 1.0, rtol=0, atol=1e-9
         ):
             raise ValueError(
@@ -505,8 +516,7 @@ def summarize_selection_reports(
         )
 
     if (
-        frame.loc[fallback_rows, "fallback_reason"]
-        != COLD_START_REASON
+        ~frame.loc[fallback_rows, "fallback_reason"].isin((COLD_START_REASON, "zero_total_predicted_risk"))
     ).any():
         raise ValueError(
             "Invalid fallback reason."

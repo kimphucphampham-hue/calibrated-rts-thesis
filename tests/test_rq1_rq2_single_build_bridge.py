@@ -149,10 +149,15 @@ def test_no_eligible_positive_history_uses_retest_all(monkeypatch):
     assert set(result.selected_test_ids) == {"a", "b"}
 
 
-def test_zero_predicted_risk_is_not_silently_approved(monkeypatch):
+def test_zero_predicted_risk_uses_conservative_retest_all(monkeypatch):
     install_fake(monkeypatch, probabilities={"a": 0.0, "b": 0.0})
-    with pytest.raises(ValueError):
-        execute(fixture_frames())
+    import math
+    result = execute(fixture_frames())
+    assert result.selection_mode == "fallback_retest_all"
+    assert result.report["fallback_reason"] == "zero_total_predicted_risk"
+    assert result.report["n_selected"] == result.report["n_tests"] == len(result.selected_test_ids)
+    assert result.report["tsr"] == pytest.approx(1.0)
+    assert math.isnan(result.report["retained_risk_ratio"])
 
 
 def test_probabilities_variant_can_be_changed_without_accessing_oracle(monkeypatch):
