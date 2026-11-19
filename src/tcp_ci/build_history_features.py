@@ -1055,7 +1055,13 @@ def compute_changed_entity_count(
                     > row.build_started_at
                 ).any()
 
-                if not has_future_change:
+                # An unknown event time or decision cutoff is NOT proof of
+                # pre-execution availability; the whole build stays missing.
+                if (
+                    not has_future_change
+                    and pd.notna(row.build_started_at)
+                    and matched["CommitDate"].notna().all()
+                ):
                     feature_value = float(
                         matched[
                             "EntityId"
