@@ -9,7 +9,7 @@ NOT a final longitudinal runner, Method Freeze, or deployment simulator.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,10 @@ from src.tcp_ci.rq1_preselection_adapter import predict_preselection_rq1
 from src.tcp_ci.rq1_fitted_snapshot_prototype import predict_from_rq1_snapshot
 from src.tcp_ci.rq2_cold_start_orchestrator import select_with_cold_start_fallback
 from src.tcp_ci.rq2_cold_start_reporting import evaluate_post_selection
+from src.tcp_ci.rq2_cost_adapter import estimate_build_costs
+from src.tcp_ci.rq2_h2_budget_pairing import (
+    H2BudgetPairedBuild, pair_h2_budget_comparators_for_build,
+)
 
 IDENTITY = ("project_id", "build_id", "build_index", "test_id")
 POST_EXECUTION = frozenset({"failed", "execution_time_ms", "verdict_raw", "duration"})
@@ -36,6 +40,8 @@ class SingleBuildResult:
     prediction_view: pd.DataFrame
     rq1_diagnostics: Dict
     report: Dict
+    h2_budget_pairing: Optional[H2BudgetPairedBuild] = None
+    h2_status: str = "not_requested"
 
 
 def _validate_build(frame: pd.DataFrame, name: str) -> Tuple[str, str, int, set]:
@@ -96,6 +102,7 @@ def evaluate_one_build_with_rq1(
     core_features_config: dict,
     *,
     rq1_snapshot=None,  # opt-in synthetic fitted object; legacy default unchanged
+    include_h2_budget: bool = False,  # opt-in causal H2 selection comparison
 ) -> SingleBuildResult:
     """Bridge existing RQ1 adapter to real RQ2 selector/reporting for ONE build.
 
@@ -104,6 +111,8 @@ def evaluate_one_build_with_rq1(
     a selection is fixed. Callers must ensure upstream F1/F2/F3 features
     and prior historical state are causal; this function cannot certify them.
     """
+    if not isinstance(include_h2_budget, bool):
+        raise ValueError("include_h2_budget must be boolean.")
     project, build_id, target_index, expected_ids = _validate_build(
         target_preexecution, "target_preexecution"
     )
@@ -187,7 +196,81 @@ def evaluate_one_build_with_rq1(
     selection = select_with_cold_start_fallback(
         target=decision, history=history.copy(deep=True), probabilities=aligned_p, rho=rho
     )
-    # Only after selection is computed does target truth reach the offline scorer.
+    # WP6.2-E2: optional PRE-SELECTION comparison using causally materialized
+    # F1 history rates plus the SAME historical cost adapter as the selector.
+    # No target oracle value is consulted before the compared sets are fixed.
+    h2 = None
+    h2_status = "not_requested"
+    if include_h2_budget:
+        if selection.selection_mode == "fallback_retest_all":
+            if selection.fallback_reason not in {
+                "zero_total_predicted_risk", "no_positive_prior_cost_history",
+            }:
+                raise ValueError("Unsupported H2 fallback reason.")
+            # No defensible positive reference estimated-cost cap exists here.
+            h2_status = "not_applicable_" + selection.fallback_reason
+        elif selection.selection_mode == "normal_risk_density":
+            required = {"failure_rate_history", "prior_execution_count"}
+            if not required.issubset(target_preexecution.columns):
+                raise ValueError("H2 requires causally materialized F1 history features.")
+            counts = pd.to_numeric(
+                target_preexecution["prior_execution_count"], errors="raise"
+            ).to_numpy(dtype=float)
+            rates = pd.to_numeric(
+                target_preexecution["failure_rate_history"], errors="raise"
+            ).to_numpy(dtype=float)
+            if (not np.isfinite(counts).all() or (counts < 0).any()
+                    or (counts != np.floor(counts)).any()):
+                raise ValueError("Invalid H2 historical execution counts.")
+            unseen = counts == 0
+            # Explicit new-test convention: absent prior failures => rate 0.
+            # Only an unseen test may have a missing historical failure rate.
+            if (np.isinf(rates).any() or np.isnan(rates[~unseen]).any()
+                    or ((rates < 0) | (rates > 1)).any()
+                    or (np.isfinite(rates[unseen]) & (rates[unseen] != 0)).any()):
+                raise ValueError("Invalid or inconsistent H2 historical failure rates.")
+            rates[unseen] = 0.0
+
+            estimated = estimate_build_costs(
+                target=decision, history=history.copy(deep=True),
+                zero_cost_floor_ms=None,
+            )
+            ids = tuple(str(value) for value in decision["test_id"].tolist())
+            if (not estimated.index.equals(decision.index)
+                    or tuple(str(x) for x in estimated["test_id"]) != ids):
+                raise RuntimeError("H2 estimated-cost alignment changed.")
+            costs_ms = estimated["estimated_cost_ms"].to_numpy(dtype=float)
+            chosen_set = set(selection.selected_test_ids)
+            reference_cost = float(np.sum([
+                cost for test_id, cost in zip(ids, costs_ms)
+                if test_id in chosen_set
+            ]))
+            if (selection.estimated_selected_cost_ms is None
+                    or not np.isclose(
+                        reference_cost, selection.estimated_selected_cost_ms,
+                        rtol=1e-9, atol=1e-7,
+                    )):
+                raise RuntimeError("H2 reference/selector cost estimates differ.")
+            condition = (
+                "model=" + model_name,
+                "probability=" + probability_variant,
+                "rho=" + format(float(rho), ".2f"),
+                "cost_policy=historical_median",
+                "observation=" + REGIME,
+            )
+            h2 = pair_h2_budget_comparators_for_build(
+                project_id=project, build_index=target_index,
+                condition_key=condition, test_ids=ids,
+                estimated_costs_ms=costs_ms,
+                historical_failure_rates=rates,
+                reference_selected_test_ids=selection.selected_test_ids,
+            )
+            h2_status = "computed"
+        else:
+            raise ValueError("Unsupported H2 selection mode.")
+
+    # Only after selection AND all H2 compared sets are fixed does target truth
+    # reach the retrospective scoring function.
     report = evaluate_post_selection(
         target=target_oracle.copy(deep=True), selection=selection, rho=rho,
         model=model_name, probability=col, cost_policy="historical_median",
@@ -200,4 +283,5 @@ def evaluate_one_build_with_rq1(
         selection_mode=str(selection.selection_mode),
         prediction_view=predictions.copy(deep=True),
         rq1_diagnostics=dict(diagnostics), report=dict(report),
+        h2_budget_pairing=h2, h2_status=h2_status,
     )

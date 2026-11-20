@@ -80,6 +80,7 @@ def run_synthetic_multibuild_rq1_rq2(
     core_features_config: dict,
     preexecution_mode: str = "supplied_synthetic",
     snapshot_mode: str = "refit_per_build",  # opt-in synthetic only
+    include_h2_budget: bool = False,  # opt-in F1 causal H2 integration
 ) -> MultiBuildPrototypeResult:
     """Run a bounded, in-memory synthetic chronological full-history prototype.
 
@@ -98,6 +99,10 @@ def run_synthetic_multibuild_rq1_rq2(
       transform using the observed full-information prefix before EACH build.
       M2-08 remains pending; this is not a real CI completion-time simulator.
     """
+    if not isinstance(include_h2_budget, bool):
+        raise ValueError("include_h2_budget must be boolean.")
+    if include_h2_budget and preexecution_mode != "causal_from_history":
+        raise ValueError("H2 requires causal_from_history mode (no supplied rates).")
     if preexecution_mode not in {"supplied_synthetic", "causal_from_history"}:
         raise ValueError("Unsupported preexecution_mode.")
     causal = preexecution_mode == "causal_from_history"
@@ -215,6 +220,7 @@ def run_synthetic_multibuild_rq1_rq2(
             calibration_config=calibration_config,
             core_features_config=core_features_config,
             **({"rq1_snapshot": fixed_snapshot} if fixed_snapshot is not None else {}),
+            **({"include_h2_budget": True} if include_h2_budget else {}),
         )
         steps.append(step)
 
