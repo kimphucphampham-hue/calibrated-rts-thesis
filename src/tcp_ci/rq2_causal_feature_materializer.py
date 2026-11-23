@@ -24,10 +24,15 @@ from src.tcp_ci.build_history_features import (
 IDENTITY: Tuple[str, ...] = ("project_id", "build_id", "build_index", "test_id")
 HISTORY_COLUMNS = set(IDENTITY) | {"build_started_at", "failed", "execution_time_ms"}
 TARGET_COLUMNS = set(IDENTITY) | {"build_started_at", "changed_entity_count"}
+TARGET_F1_ONLY_COLUMNS = set(IDENTITY) | {"build_started_at"}
+F1_ONLY_FEATURE_COLUMNS = tuple(FEATURE_COLUMNS[:7])
 DECISION_COLUMNS = tuple(dict.fromkeys(
     (*IDENTITY, "build_started_at", *FEATURE_COLUMNS, *SUPPORT_COLUMNS)
 ))
 POST_EXECUTION = frozenset({"failed", "execution_time_ms", "verdict_raw", "duration"})
+F1_ONLY_DECISION_COLUMNS = tuple(dict.fromkeys(
+    (*IDENTITY, "build_started_at", *F1_ONLY_FEATURE_COLUMNS, *SUPPORT_COLUMNS)
+))
 
 
 def _validate_identity(frame: pd.DataFrame, label: str) -> tuple:
@@ -67,33 +72,40 @@ def _validate_identity(frame: pd.DataFrame, label: str) -> tuple:
 def materialize_target_preexecution_features(
     observed_history: pd.DataFrame,
     target_context: pd.DataFrame,
+    *,
+    feature_scope: str = "F1_F2_F3",
 ) -> pd.DataFrame:
     """Produce one target build's frozen features without target oracle inputs.
 
     observed_history: canonical, fully observed rows from STRICTLY EARLIER
       logical builds (project/build/test/start time/failed/duration). This
       must be a retrospective prefix, not a partial-selection feedback log.
-    target_context: exactly canonical keys, started-at and pre-execution F2
-      `changed_entity_count`. It MUST NOT contain outcomes, realized cost,
-      or precomputed history features from unverified provenance.
+    target_context: in default mode, canonical keys, started-at and
+      pre-execution F2 `changed_entity_count`; in explicit F1-only mode,
+      canonical keys and started-at ONLY. It MUST NOT contain outcomes,
+      realized cost, or precomputed history features.
 
     `compute_history_features` requires numeric target failed/duration even
     though the frozen formulas use strictly prior observations. Internal zero
     sentinels satisfy that legacy signature and are discarded; this is safe
     only because the target is the last build and there is one row per test.
     """
+    if feature_scope not in ("F1_F2_F3", "F1_ONLY_V1"):
+        raise ValueError("Unsupported feature_scope for causal materialization")
+    f1_only = feature_scope == "F1_ONLY_V1"
+    required_target = TARGET_F1_ONLY_COLUMNS if f1_only else TARGET_COLUMNS
     if not isinstance(observed_history, pd.DataFrame):
         raise ValueError("observed_history must be a DataFrame")
     if not isinstance(target_context, pd.DataFrame) or target_context.empty:
         raise ValueError("target_context must be a nonempty DataFrame")
     missing_hist = HISTORY_COLUMNS.difference(observed_history.columns)
-    missing_target = TARGET_COLUMNS.difference(target_context.columns)
+    missing_target = required_target.difference(target_context.columns)
     if missing_hist or missing_target:
         raise ValueError(
             f"Missing canonical columns: history={sorted(missing_hist)}, "
             f"target={sorted(missing_target)}"
         )
-    unexpected_target = set(target_context.columns).difference(TARGET_COLUMNS)
+    unexpected_target = set(target_context.columns).difference(required_target)
     if unexpected_target:
         raise ValueError(f"target_context has unexpected fields: {sorted(unexpected_target)}")
 
@@ -120,11 +132,12 @@ def materialize_target_preexecution_features(
                 or (durations < 0).any() or (durations != np.floor(durations)).any()):
             raise ValueError("History has invalid realized durations")
 
-    change_count = pd.to_numeric(target_context["changed_entity_count"], errors="raise")
-    defined = change_count.dropna()
-    if (not np.isfinite(defined.to_numpy(dtype=float)).all()
-            or (defined < 0).any() or (defined != np.floor(defined)).any()):
-        raise ValueError("Target has invalid changed_entity_count")
+    if not f1_only:
+        change_count = pd.to_numeric(target_context["changed_entity_count"], errors="raise")
+        defined = change_count.dropna()
+        if (not np.isfinite(defined.to_numpy(dtype=float)).all()
+                or (defined < 0).any() or (defined != np.floor(defined)).any()):
+            raise ValueError("Target has invalid changed_entity_count")
 
     # Select only the required source fields: do not accidentally reuse
     # previously computed or label-dependent columns from historical frames.
@@ -137,18 +150,24 @@ def materialize_target_preexecution_features(
         historical["changed_entity_count"] = np.nan
 
     current = target_context.loc[:, list(IDENTITY) + [
-        "build_started_at", "changed_entity_count"
+        "build_started_at"
     ]].copy(deep=True)
+    # Missing F2 is an internal sentinel solely to reuse the historical
+    # F1 computation; no F2/F3 fields are returned in F1-only mode.
+    current["changed_entity_count"] = (
+        np.nan if f1_only else target_context["changed_entity_count"].copy()
+    )
     # Private sentinels. No target oracle argument exists in this API.
     current["failed"] = 0
     current["execution_time_ms"] = 0
     joined = pd.concat([historical, current], ignore_index=True)
 
     materialized = compute_history_features(joined)
+    decision_columns = F1_ONLY_DECISION_COLUMNS if f1_only else DECISION_COLUMNS
     subset = materialized.loc[
         materialized["build_index"].eq(target_index)
         & materialized["project_id"].astype(str).eq(project),
-        list(DECISION_COLUMNS),
+        list(decision_columns),
     ].copy(deep=True)
     if len(subset) != len(current):
         raise AssertionError("Frozen feature transform lost target rows")

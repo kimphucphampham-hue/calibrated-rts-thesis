@@ -46,6 +46,20 @@ PREDICTION_ID_COLUMNS = (
 )
 
 
+# Pre-freeze opt-in only. This does NOT change the historical 11-feature
+# CORE/RQ1 contract or authorize a final confirmatory experiment.
+F1_OPT_IN_SCOPE = "F1_ONLY_V1"
+F1_ONLY_FEATURES = (
+    "failure_rate_history",
+    "recent_failure",
+    "consecutive_failures",
+    "consecutive_passes",
+    "test_age_builds",
+    "time_since_last_failure_builds",
+    "execution_time_mean_history_ms",
+)
+
+
 PROBABILITY_COLUMNS = {
     "uncalibrated":
         "p_uncalibrated",
@@ -117,10 +131,17 @@ def rq1_feature_columns(
         ]
     )
 
-    if (
-        feature_set_name
-        != primary_feature_set
-    ):
+    feature_scope = rq1_config.get("pre_freeze_feature_scope")
+    if feature_scope not in (None, F1_OPT_IN_SCOPE):
+        raise ValueError("Unsupported pre-freeze feature scope.")
+    if feature_scope == F1_OPT_IN_SCOPE:
+        if feature_set_name != "F1":
+            raise ValueError("F1-only opt-in requires the F1 feature set.")
+        if primary_feature_set != "F1_F2_F3":
+            raise ValueError("F1-only opt-in must preserve frozen CORE primary.")
+        if rq1_config.get("scope", {}).get("primary_final_evidence") is not False:
+            raise ValueError("F1-only opt-in cannot claim primary final evidence.")
+    elif feature_set_name != primary_feature_set:
         raise ValueError(
             "RQ1 feature set does not "
             "match the frozen CORE "
@@ -153,6 +174,9 @@ def rq1_feature_columns(
     validate_feature_list(
         features
     )
+
+    if feature_scope == F1_OPT_IN_SCOPE and tuple(features) != F1_ONLY_FEATURES:
+        raise ValueError("F1-only opt-in requires exactly seven frozen F1 features.")
 
     return features
 
@@ -359,7 +383,10 @@ def validate_rq1_integration_contract(
         )
     )
 
-    if len(features) != 11:
+    if rq1_config.get("pre_freeze_feature_scope") == F1_OPT_IN_SCOPE:
+        if tuple(features) != F1_ONLY_FEATURES:
+            raise ValueError("F1-only opt-in requires exactly seven frozen F1 features.")
+    elif len(features) != 11:
         raise ValueError(
             "RQ1 v1 full CORE feature "
             "set must contain 11 "
