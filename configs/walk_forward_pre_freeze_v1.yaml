@@ -1,0 +1,32 @@
+# Synthetic-only settings; not the approved CORE contract.
+{
+  "version": 1,
+  "scope": "PRE_FREEZE_SYNTHETIC_ONLY",
+  "execution_authorized": false,
+  "method_freeze": "NOT_APPROVED",
+  "project_id": "synthetic-wp7-4-r2",
+  "feature_scope": "F1_ONLY_V1",
+  "models": [
+    "logistic_regression",
+    "random_forest",
+    "xgboost"
+  ],
+  "arms": {
+    "static": null,
+    "h5": 5,
+    "h10": 10,
+    "h20": 20
+  },
+  "rho": [
+    0.9,
+    0.95,
+    0.99
+  ],
+  "initial_development_fraction": 0.8,
+  "random_repetitions": 30,
+  "observation_regime": "retrospective_full_information",
+  "calibration_config": "configs/calibration_v1.yaml",
+  "rq1_config": "configs/rq1_v1.yaml",
+  "model_config": "configs/rq1_models_v1.yaml",
+  "core_features_config": "configs/core_features_v1.yaml"
+}
