@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import fsum
+from fractions import Fraction
 from typing import Sequence, Tuple
 
 from src.tcp_ci.rq2_baseline_pairing import (
@@ -20,6 +21,7 @@ from src.tcp_ci.rq2_baseline_pairing import (
 )
 from src.tcp_ci.rq2_baselines import (
     BaselineResult,
+    _budgeted_add,
     failure_history_select,
     history_duration_select,
 )
@@ -46,12 +48,13 @@ def _pack_ranked_ids(
 ) -> BaselineResult:
     """Reuse historical rank order, skipping items over remaining budget."""
     chosen: list[str] = []
-    running_cost = 0.0
+    running_cost = Fraction(0)
     for test_id in ranked_test_ids:
         cost = positive_costs_by_id[test_id]
-        if cost <= budget_ms - running_cost:
+        candidate = _budgeted_add(running_cost, cost, budget_ms)
+        if candidate is not None:
             chosen.append(test_id)
-            running_cost = fsum((running_cost, cost))
+            running_cost = candidate
     total_cost = fsum(positive_costs_by_id[t] for t in chosen)
     if total_cost > budget_ms:
         raise RuntimeError("Historical comparator exceeded reference budget")

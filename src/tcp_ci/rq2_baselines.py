@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import fsum
+from fractions import Fraction
 from typing import Sequence
 
 import numpy as np
@@ -126,6 +127,22 @@ def random_matched_count(
         baseline_name="random_matched_count",
     )
 
+def _budgeted_add(spent: Fraction, cost: float, budget: float):
+    """Return the exact new positive-cost sum if its float value is in cap.
+
+    The cap and reported cost are floats (reference computed with fsum).
+    Exact accumulation avoids rounding in ``budget - spent`` and cumulative
+    double rounding. Convert only the prospective total for comparison;
+    overflow cannot be affordable under a finite cap.
+    """
+    candidate = spent + Fraction.from_float(float(cost))
+    try:
+        affordable = float(candidate) <= budget
+    except OverflowError:
+        affordable = False
+    return candidate if affordable else None
+
+
 def random_matched_budget(
     test_ids: Sequence[str],
     costs_ms: Sequence[float],
@@ -167,16 +184,16 @@ def random_matched_budget(
     positions = rng.permutation(len(ids))
 
     selected = []
-    spent = 0.0
+    spent = Fraction(0)
 
     for position in positions:
         i = canonical[int(position)]
         cost = float(costs[i])
 
-        # Check affordability before adding, avoiding overflow.
-        if cost <= budget - spent:
+        candidate = _budgeted_add(spent, cost, budget)
+        if candidate is not None:
             selected.append(i)
-            spent = fsum((spent, cost))
+            spent = candidate
 
     selected.sort(key=lambda i: ids[i])
 
