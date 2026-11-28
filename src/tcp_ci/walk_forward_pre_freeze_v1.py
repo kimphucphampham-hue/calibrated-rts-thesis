@@ -230,6 +230,11 @@ def _run(dev, contexts, reveal, *, config=WorkingConfig(), on_fixed=lambda i, ch
 
 
 def _budget_inputs(pre, decision, history):
+    return _budget_inputs_with_provider(pre, decision, lambda: estimate_build_costs(
+        target=decision, history=history, zero_cost_floor_ms=None))
+
+
+def _budget_inputs_with_provider(pre, decision, cost_provider):
     # Mirror the committed bridge's validation and unseen-test convention.
     counts = pd.to_numeric(pre.prior_execution_count, errors='raise').to_numpy(dtype=float)
     rates = pd.to_numeric(pre.failure_rate_history, errors='raise').to_numpy(dtype=float, copy=True)
@@ -240,7 +245,7 @@ def _budget_inputs(pre, decision, history):
         ((rates < 0) | (rates > 1)).any() or (np.isfinite(rates[unseen]) & (rates[unseen] != 0)).any()):
         raise ValueError('Invalid historical failure rates')
     rates[unseen] = 0.0
-    estimated = estimate_build_costs(target=decision, history=history, zero_cost_floor_ms=None)
+    estimated = cost_provider()
     ids = tuple(decision.test_id)
     if not estimated.index.equals(decision.index) or tuple(estimated.test_id) != ids:
         raise ValueError('H2 cost identity mismatch')

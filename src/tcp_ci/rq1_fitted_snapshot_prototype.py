@@ -6,6 +6,7 @@ existing pipeline/Protocol v1. An object is held in memory, not serialized.
 """
 
 from dataclasses import dataclass
+from time import perf_counter_ns
 from typing import Any, Optional, Tuple
 
 import numpy as np
@@ -89,12 +90,15 @@ def fit_rq1_snapshot(
     model_config: dict,
     calibration_config: dict,
     core_features_config: dict,
+    timing_sink=None,
 ) -> RQ1FittedSnapshot:
     """Fit model/optional calibrators once; do not consume any evaluation row.
 
     Split/cohort policies are delegated to frozen RQ1 implementation.
     Insufficient calibration support retains only uncalibrated predictions.
     """
+    clock = perf_counter_ns if timing_sink is not None else lambda: 0
+    start = clock()
     project, indices = _validate_rows(development, "development", labels_expected=True)
     features = tuple(validate_rq1_integration_contract(
         rq1_config=rq1_config,
@@ -129,25 +133,33 @@ def fit_rq1_snapshot(
     if sufficient and calibration.empty:
         raise ValueError("sufficient calibration split unexpectedly empty")
 
+    model = build_rq1_model(
+        model_name=model_name, feature_columns=list(features), model_config=model_config
+    )
+    t = clock()
     fitted_model = fit_probability_model(
-        build_rq1_model(
-            model_name=model_name,
-            feature_columns=list(features),
-            model_config=model_config,
-        ),
+        model,
         model_fit[list(features)],
         model_fit["failed"],
     )
+    model_fit_ns = clock() - t
+    calibration_prediction_ns = platt_fit_ns = isotonic_fit_ns = 0
     platt = isotonic = None
     if sufficient:
+        t = clock()
         calibration_probability = positive_probability(fitted_model, calibration[list(features)])
+        calibration_prediction_ns = clock() - t
         calibration_target = calibration["failed"]
         platt = build_platt_calibrator(calibration_config)
+        t = clock()
         platt.fit(calibration_probability, calibration_target)
+        platt_fit_ns = clock() - t
         isotonic = build_isotonic_calibrator(calibration_config)
+        t = clock()
         isotonic.fit(calibration_probability, calibration_target)
+        isotonic_fit_ns = clock() - t
 
-    return RQ1FittedSnapshot(
+    result = RQ1FittedSnapshot(
         model_name=model_name,
         project_id=project,
         feature_columns=features,
@@ -160,6 +172,19 @@ def fit_rq1_snapshot(
         calibration_first_build_index=calibration_min,
         calibration_last_build_index=calibration_max,
     )
+
+    total = clock() - start
+    if timing_sink is not None:
+        timing_sink(dict(model=model_name,cutoff=result.last_development_build_index,
+            snapshot_total_ns=total,model_fit_ns=model_fit_ns,
+            calibration_prediction_ns=calibration_prediction_ns,platt_fit_ns=platt_fit_ns,
+            isotonic_fit_ns=isotonic_fit_ns,
+            other_snapshot_ns=total-model_fit_ns-calibration_prediction_ns-platt_fit_ns-isotonic_fit_ns,
+            model_fit_builds=len(split.model_fit_builds),calibration_builds=len(split.calibration_builds),
+            expanded_by_builds=split.expanded_by_builds,calibration_status=split.status,
+            positive_rows=split.support.positive_rows,negative_rows=split.support.negative_rows,
+            failing_builds=split.support.failing_builds,passing_builds=split.support.passing_builds))
+    return result
 
 
 def predict_from_rq1_snapshot(

@@ -67,6 +67,20 @@ def select_with_cold_start_fallback(
     probabilities,
     rho: float,
 ) -> ColdStartSelectionResult:
+    """Select using strictly earlier history, with the existing cold-start policy."""
+    return _select_with_cost_provider(
+        target,
+        lambda: estimate_build_costs(target=target, history=history, zero_cost_floor_ms=None),
+        probabilities, rho,
+    )
+
+
+def _select_with_cost_provider(
+    target: pd.DataFrame,
+    cost_provider,
+    probabilities,
+    rho: float,
+) -> ColdStartSelectionResult:
     """Run a candidate decision-time selection policy.
 
     Probabilities must be in the same row order as target.
@@ -156,11 +170,7 @@ def select_with_cold_start_fallback(
         )
 
     try:
-        costs = estimate_build_costs(
-            target=target,
-            history=history,
-            zero_cost_floor_ms=None,
-        )
+        costs = cost_provider()
 
     except ValueError as exc:
         # Intentionally exact matching.
